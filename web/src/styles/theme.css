@@ -95,28 +95,29 @@ For commercial licensing, please contact support@quantumnous.com
 }
 
 :root {
-  --radius: 1rem;
+  --radius: 0.5rem;
   --app-header-height: 3rem;
   /* Static build-channel fallback consumed when JS hasn't booted yet. */
   --app-rev: '2k6e8r7p';
-  /* Auto starts with the browser font, including before JS applies the
-   * saved preference. Explicit Sans selects Public Sans in theme-presets.css. */
-  --font-ui-sans: sans-serif;
+  /* Tokara uses the bundled sans face with local CJK fallbacks.
+   * Explicit font preferences remain controlled by theme-presets.css. */
+  --font-ui-sans:
+    'Public Sans Variable', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-body: var(--font-ui-sans);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --background: #fafbf8;
+  --foreground: #182e2c;
+  --card: #ffffff;
+  --card-foreground: #182e2c;
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.692 0.141 243.716);
+  --popover-foreground: #182e2c;
+  --primary: #02776f;
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0 0);
-  --secondary-foreground: oklch(0.42 0.16 250);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.49 0 0);
+  --secondary: #e9f2eb;
+  --secondary-foreground: #005c56;
+  --muted: #f1f4ed;
+  --muted-foreground: #65746b;
   --accent: color-mix(in oklch, var(--primary) 12%, var(--background));
-  --accent-foreground: oklch(0.145 0 0);
+  --accent-foreground: #005c56;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --success: oklch(0.596 0.145 163.225);
@@ -127,26 +128,26 @@ For commercial licensing, please contact support@quantumnous.com
   --info-foreground: oklch(0.985 0 0);
   --neutral: oklch(0.708 0 0);
   --neutral-foreground: oklch(0.145 0 0);
-  --border: oklch(0.93 0 0);
-  --input: oklch(0.93 0 0);
-  --ring: oklch(0.708 0.16 249.003);
-  --chart-1: oklch(0.72 0.18 250);
-  --chart-2: oklch(0.65 0.15 200);
-  --chart-3: oklch(0.7 0.12 280);
-  --chart-4: oklch(0.68 0.19 325);
-  --chart-5: oklch(0.68 0.16 155);
-  --overview-accent-1: oklch(0.72 0.18 250);
-  --overview-accent-2: oklch(0.65 0.15 200);
-  --overview-accent-3: oklch(0.7 0.12 280);
+  --border: #e4e8e1;
+  --input: #d6ded3;
+  --ring: #02776f;
+  --chart-1: #02776f;
+  --chart-2: #72956a;
+  --chart-3: #93a882;
+  --chart-4: #467e87;
+  --chart-5: #b09566;
+  --overview-accent-1: #02776f;
+  --overview-accent-2: #72956a;
+  --overview-accent-3: #93a882;
   --sidebar: color-mix(in oklch, var(--foreground) 0.5%, var(--background));
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.64 0.197 253.892);
+  --sidebar-foreground: #182e2c;
+  --sidebar-primary: #02776f;
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: color-mix(in oklch, var(--primary) 12%, var(--background));
-  --sidebar-accent-foreground: oklch(0.579 0.196 255.909);
-  --sidebar-border: oklch(0.93 0 0);
-  --sidebar-ring: oklch(0.58 0.2 250);
-  --skeleton-base: oklch(0.97 0 0);
+  --sidebar-accent-foreground: #005c56;
+  --sidebar-border: #e4e8e1;
+  --sidebar-ring: #02776f;
+  --skeleton-base: #edf1e8;
   --skeleton-highlight: oklch(0.985 0 0);
   --table-row: var(--background);
   --table-header: color-mix(
@@ -182,19 +183,19 @@ For commercial licensing, please contact support@quantumnous.com
   /* Native controls follow the theme; Dark Reader also reads this to detect
      the built-in dark theme. */
   color-scheme: dark;
-  /* OpenAI-like dark mode with a crisp charcoal canvas. */
-  --background: oklch(0.235 0 0);
-  --foreground: oklch(0.965 0 0);
-  --card: oklch(0.285 0 0);
+  /* Tokara night palette keeps the same teal identity and readable surfaces. */
+  --background: #101c1b;
+  --foreground: #edf4ed;
+  --card: #172725;
   --card-foreground: oklch(0.965 0 0);
-  --popover: oklch(0.305 0 0);
+  --popover: #1b2e2b;
   --popover-foreground: oklch(0.965 0 0);
-  --primary: oklch(0.54 0.142 248.516);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.335 0 0);
-  --secondary-foreground: oklch(0.9 0.05 250);
-  --muted: oklch(0.305 0 0);
-  --muted-foreground: oklch(0.78 0 0);
+  --primary: #67c7b7;
+  --primary-foreground: #102c28;
+  --secondary: #203a32;
+  --secondary-foreground: #b5e2d6;
+  --muted: #1b2e29;
+  --muted-foreground: #a1b5a9;
   --accent: color-mix(in oklch, var(--primary) 20%, var(--background));
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
@@ -209,20 +210,23 @@ For commercial licensing, please contact support@quantumnous.com
   --neutral-foreground: oklch(0.155 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 17%);
-  --ring: oklch(0.554 0.148 250.726);
-  --chart-1: oklch(0.76 0.14 250);
-  --chart-2: oklch(0.76 0.13 200);
-  --chart-3: oklch(0.76 0.13 285);
-  --chart-4: oklch(0.75 0.16 325);
-  --chart-5: oklch(0.76 0.14 155);
-  --sidebar: oklch(0.225 0 0);
+  --ring: #67c7b7;
+  --chart-1: #67c7b7;
+  --chart-2: #a2be8d;
+  --chart-3: #b8cda5;
+  --chart-4: #81bbc3;
+  --chart-5: #d7bc8c;
+  --overview-accent-1: #67c7b7;
+  --overview-accent-2: #a2be8d;
+  --overview-accent-3: #b8cda5;
+  --sidebar: #13211e;
   --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.588 0.123 246.488);
-  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-primary: #67c7b7;
+  --sidebar-primary-foreground: #102c28;
   --sidebar-accent: color-mix(in oklch, var(--primary) 20%, var(--background));
-  --sidebar-accent-foreground: oklch(0.9 0.05 250);
+  --sidebar-accent-foreground: #b5e2d6;
   --sidebar-border: oklch(1 0 0 / 11%);
-  --sidebar-ring: oklch(0.7 0.17 250);
+  --sidebar-ring: #67c7b7;
   --skeleton-base: oklch(0.335 0 0);
   --skeleton-highlight: oklch(0.44 0 0);
   --table-row: var(--background);

@@ -30,6 +30,7 @@ import {
 import {
   STATUS_QUERY_KEY,
   ensureStatus,
+  mapStatusDataToConfig,
   statusQueryOptions,
 } from '@/lib/status-query'
 import { useSystemConfigStore } from '@/stores/system-config-store'
@@ -262,4 +263,29 @@ describe('module guard status freshness', () => {
       })
     }
   )
+})
+
+describe('Tokara site branding', () => {
+  test.each([
+    {},
+    { system_name: '', logo: '' },
+    { system_name: 'New API', logo: '/logo.png' },
+  ])('uses Tokara for empty and legacy built-in branding: %j', (status) => {
+    expect(mapStatusDataToConfig(status)).toMatchObject({
+      systemName: 'Tokara',
+      logo: '/tokara-symbol.webp',
+    })
+  })
+
+  test('preserves administrator-configured names and logos', () => {
+    expect(
+      mapStatusDataToConfig({
+        system_name: 'Custom gateway',
+        logo: 'https://example.com/custom.svg',
+      })
+    ).toMatchObject({
+      systemName: 'Custom gateway',
+      logo: 'https://example.com/custom.svg',
+    })
+  })
 })

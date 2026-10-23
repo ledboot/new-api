@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/sidebar'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import { DEFAULT_LOGO, DEFAULT_SYSTEM_NAME } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
 type SystemBrandProps = {
@@ -48,10 +49,13 @@ type SystemBrandProps = {
 export function SystemBrand(props: SystemBrandProps) {
   const { t } = useTranslation()
   const { status } = useStatus()
-  const { logo } = useSystemConfig()
+  const { logo, systemName } = useSystemConfig()
 
   const variant = props.variant ?? 'sidebar'
-  const name = status?.system_name || props.defaultName || 'New API'
+  const name = status?.system_name
+    ? systemName
+    : props.defaultName || systemName
+  const isTokara = name === DEFAULT_SYSTEM_NAME && logo === DEFAULT_LOGO
   const version =
     status?.version || props.defaultVersion || t('Unknown version')
 
@@ -65,14 +69,24 @@ export function SystemBrand(props: SystemBrandProps) {
           'hover:bg-accent focus-visible:ring-ring/40 focus-visible:ring-2'
         )}
       >
-        <div className='flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md'>
+        {isTokara ? (
           <img
-            src={logo}
-            alt={t('Logo')}
-            className='size-full rounded-md object-cover'
+            src='/tokara-logo.webp'
+            alt={name}
+            className='tokara-wordmark h-6 w-auto max-w-28 object-contain'
           />
-        </div>
-        <span className='max-w-[12rem] truncate'>{name}</span>
+        ) : (
+          <>
+            <div className='flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md'>
+              <img
+                src={logo}
+                alt={t('Logo')}
+                className='size-full rounded-md object-cover'
+              />
+            </div>
+            <span className='max-w-[12rem] truncate'>{name}</span>
+          </>
+        )}
       </Link>
     )
   }
@@ -89,7 +103,7 @@ export function SystemBrand(props: SystemBrandProps) {
             <img
               src={logo}
               alt={t('Logo')}
-              className='size-full rounded-lg object-cover'
+              className='size-full object-contain'
             />
           </div>
           <div className='grid flex-1 text-start text-sm leading-tight group-data-[collapsible=icon]:hidden'>

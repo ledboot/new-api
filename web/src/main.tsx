@@ -26,7 +26,11 @@ import { applyFaviconToDom } from '@/lib/dom-utils'
 import '@/lib/dayjs'
 import { initializeFrontendCache } from '@/lib/frontend-cache'
 import { createAppQueryClient } from '@/lib/query-client'
-import { readCachedStatus, statusQueryOptions } from '@/lib/status-query'
+import {
+  mapStatusDataToConfig,
+  readCachedStatus,
+  statusQueryOptions,
+} from '@/lib/status-query'
 
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
@@ -79,9 +83,9 @@ if (!rootElement) {
       if (metaTitle) metaTitle.setAttribute('content', name)
     }
     // Cache-first
-    const cached = readCachedStatus()
-    if (cached?.system_name) apply(cached.system_name as string)
-    if (cached?.logo) applyFaviconToDom(cached.logo as string)
+    const cached = mapStatusDataToConfig(readCachedStatus())
+    if (cached.systemName) apply(cached.systemName)
+    if (cached.logo) applyFaviconToDom(cached.logo)
 
     // Background refresh through the shared cache. This primes ['status']
     // before React mounts, so the root guard and every status consumer reuse
@@ -89,9 +93,10 @@ if (!rootElement) {
     // localStorage write and the system-config store sync.
     queryClient
       .ensureQueryData(statusQueryOptions)
-      .then((s) => {
-        if (s?.system_name) apply(s.system_name as string)
-        if (s?.logo) applyFaviconToDom(s.logo as string)
+      .then((status) => {
+        const config = mapStatusDataToConfig(status)
+        if (config.systemName) apply(config.systemName)
+        if (config.logo) applyFaviconToDom(config.logo)
       })
       .catch(() => {
         /* empty */
