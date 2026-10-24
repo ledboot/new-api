@@ -37,6 +37,7 @@ import { formatTimestampRelative, formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { SYSTEM_TASK_TYPE_LABEL } from '../constants'
+import { OpenLuxSyncDetails } from './openlux-sync-details'
 
 const STATUS_VARIANT: Record<SystemTaskStatus, 'secondary' | 'destructive'> = {
   pending: 'secondary',
@@ -166,7 +167,11 @@ export function SystemTasksTable(props: SystemTasksTableProps) {
                 className='text-destructive max-w-[220px] truncate py-3 pr-4 align-middle text-xs'
                 title={task.error || undefined}
               >
-                {task.error || '-'}
+                {task.type === 'openlux_sync' && task.status === 'succeeded' ? (
+                  <OpenLuxSyncDetails result={task.result} />
+                ) : (
+                  task.error || '-'
+                )}
               </TableCell>
             </TableRow>
           )

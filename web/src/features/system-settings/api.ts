@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 
 import type {
+  OpenLuxCatalog,
+  OpenLuxSource,
   ConfirmPaymentComplianceResponse,
   FetchUpstreamRatiosRequest,
   LogCleanupTask,
@@ -123,5 +125,23 @@ export async function fetchUpstreamRatios(request: FetchUpstreamRatiosRequest) {
     '/api/ratio_sync/fetch',
     request
   )
+  return res.data
+}
+
+export async function getOpenLuxCatalog(): Promise<{
+  success: boolean
+  message?: string
+  data: OpenLuxCatalog
+}> {
+  const res = await api.get('/api/ratio_sync/openlux')
+  return res.data
+}
+
+export async function publishOpenLuxPricing(request: {
+  channel_id: number
+  source: OpenLuxSource
+  changes: import('@/features/model-pricing/api').ModelPricingChange[]
+}) {
+  const res = await api.post('/api/ratio_sync/openlux/publish', request)
   return res.data
 }

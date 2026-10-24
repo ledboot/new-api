@@ -534,3 +534,43 @@ func TestApplyWebSocketSubprotocolAuthorizationReadsRepeatedHeaders(t *testing.T
 	assert.True(t, applyWebSocketSubprotocolAuthorization(header))
 	assert.Equal(t, "Bearer sk-later-field", header.Get("Authorization"))
 }
+
+// Source discovery and publishing share the existing root-only pricing scopes.
+func TestOpenLuxPricingRoutesEnforceRootScopes(t *testing.T) {
+	setupDashboardAuthMiddlewareTest(t)
+	root := createMiddlewarePATUser(t, "openlux-root", "openlux-legacy-root")
+	require.NoError(t, model.DB.Model(root).Update("role", common.RoleRootUser).Error)
+	read, _ := createMiddlewareScopedToken(t, root.Id, 0, "option:read")
+	write, _ := createMiddlewareScopedToken(t, root.Id, 0, "option:write")
+	admin := createMiddlewarePATUser(t, "openlux-admin", "openlux-legacy-admin")
+	require.NoError(t, model.DB.Model(admin).Update("role", common.RoleAdminUser).Error)
+	adminWrite, _ := createMiddlewareScopedToken(t, admin.Id, 0, "option:write")
+	router := gin.New()
+	ok := func(c *gin.Context) { c.Status(http.StatusNoContent) }
+	router.GET("/api/ratio_sync/openlux", RootAuth(), ok)
+	router.POST("/api/ratio_sync/openlux/publish", RootAuth(), ok)
+	for _, test := range []struct {
+		name, method, path, token string
+		status                    int
+	}{
+		{"root reads catalog", http.MethodGet, "/api/ratio_sync/openlux", read, http.StatusNoContent},
+		{"root publishes prices", http.MethodPost, "/api/ratio_sync/openlux/publish", write, http.StatusNoContent},
+		{"read scope cannot publish", http.MethodPost, "/api/ratio_sync/openlux/publish", read, http.StatusForbidden},
+		{"write scope cannot read", http.MethodGet, "/api/ratio_sync/openlux", write, http.StatusForbidden},
+		{"admin cannot publish", http.MethodPost, "/api/ratio_sync/openlux/publish", adminWrite, http.StatusForbidden},
+		{"anonymous cannot publish", http.MethodPost, "/api/ratio_sync/openlux/publish", "", http.StatusUnauthorized},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(test.method, test.path, nil)
+			if test.token != "" {
+				request.Header.Set("Authorization", "Bearer "+test.token)
+			}
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			assert.Equal(t, test.status, response.Code, response.Body.String())
+			if test.token != "" {
+				assert.NotContains(t, response.Body.String(), test.token, "credentials must not enter responses")
+			}
+		})
+	}
+}

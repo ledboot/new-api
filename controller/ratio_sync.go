@@ -86,9 +86,10 @@ var numericPricingSyncFields = map[string]bool{
 }
 
 type upstreamResult struct {
-	Name string         `json:"name"`
-	Data map[string]any `json:"data,omitempty"`
-	Err  string         `json:"err,omitempty"`
+	Name    string         `json:"name"`
+	Data    map[string]any `json:"data,omitempty"`
+	Err     string         `json:"err,omitempty"`
+	OpenLux *openLuxQuote  `json:"openlux,omitempty"`
 }
 
 func valueMap(value any) map[string]any {
@@ -210,7 +211,7 @@ func modelPricingSyncValues(data map[string]any, name string) map[string]any {
 
 func FetchUpstreamRatios(c *gin.Context) {
 	var req struct {
-		dto.UpstreamRequest
+		openLuxUpstreamRequest
 		IncludeUnchanged bool `json:"include_unchanged"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -322,6 +323,19 @@ func FetchUpstreamRatios(c *gin.Context) {
 
 			ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(req.Timeout)*time.Second)
 			defer cancel()
+			if chItem.Endpoint == "openlux" {
+				data, quote, err := openLuxPricing(ctx, chItem.ID, req.OpenLux[chItem.ID])
+				result := upstreamResult{Name: uniqueName, Data: data, OpenLux: quote}
+				if err != nil {
+					result.Err = err.Error()
+				}
+				ch <- result
+				return
+			}
+			if strings.Contains(fullURL, "/api/pricing_new") {
+				ch <- upstreamResult{Name: uniqueName, Err: "Use the OpenLux source to preserve group and tier pricing"}
+				return
+			}
 
 			httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
 			if err != nil {
@@ -576,12 +590,16 @@ func FetchUpstreamRatios(c *gin.Context) {
 	localData := effectivePricingSyncData(getLocalPricingSyncData())
 
 	var testResults []dto.TestResult
+	openLuxQuotes := map[string]*openLuxQuote{}
 	var successfulChannels []struct {
 		name string
 		data map[string]any
 	}
 
 	for r := range ch {
+		if r.OpenLux != nil {
+			openLuxQuotes[r.Name] = r.OpenLux
+		}
 		if r.Err != "" {
 			testResults = append(testResults, dto.TestResult{
 				Name:   r.Name,
@@ -651,6 +669,7 @@ func FetchUpstreamRatios(c *gin.Context) {
 			"differences":  differences,
 			"prices":       prices,
 			"test_results": testResults,
+			"openlux":      openLuxQuotes,
 		},
 	})
 }

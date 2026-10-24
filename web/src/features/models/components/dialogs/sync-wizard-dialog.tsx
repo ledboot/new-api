@@ -48,6 +48,7 @@ import type {
   MetadataSyncPreview,
   MetadataSyncSelection,
   SyncLocale,
+  SyncSource,
 } from '../../types'
 
 const FIELD_LABELS: Record<MetadataSyncField, string> = {
@@ -85,6 +86,7 @@ export function SyncWizardDialog(props: {
 }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const [source, setSource] = useState<SyncSource>('official')
   const [locale, setLocale] = useState<SyncLocale>('zh')
   const [preview, setPreview] = useState<MetadataSyncPreview | null>(null)
   const [scope, setScope] = useState('site')
@@ -103,7 +105,10 @@ export function SyncWizardDialog(props: {
       setPage(0)
     },
     mutationFn: async () => {
-      const response = await previewUpstreamDiff({ locale })
+      const response = await previewUpstreamDiff({
+        locale,
+        ...(source === 'openlux' ? { source } : {}),
+      })
       if (!response.success || !response.data) {
         throw createServerError(response, t('Failed to preview metadata'))
       }
@@ -119,6 +124,7 @@ export function SyncWizardDialog(props: {
     mutationFn: async (selections: MetadataSyncSelection[]) => {
       if (!preview) throw new Error(t('Preview metadata first'))
       const response = await syncUpstream({
+        ...(source === 'openlux' ? { source } : {}),
         locale: preview.source.locale,
         source_version: preview.source.version,
         selections,
@@ -399,6 +405,37 @@ export function SyncWizardDialog(props: {
       {step === 0 && (
         <div className='space-y-4'>
           <div className='flex flex-wrap items-end gap-3'>
+            <div className='space-y-1'>
+              <Label>{t('Metadata source')}</Label>
+              <Select
+                value={source}
+                disabled={busy}
+                items={[
+                  { value: 'official', label: t('Official') },
+                  { value: 'openlux', label: 'OpenLux' },
+                ]}
+                onValueChange={(value) => {
+                  if (value !== 'official' && value !== 'openlux') return
+                  setSource(value)
+                  setPreview(null)
+                  setSelection({})
+                  setPage(0)
+                  load.reset()
+                }}
+              >
+                <SelectTrigger
+                  className='w-44'
+                  aria-label={t('Metadata source')}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='official'>{t('Official')}</SelectItem>
+                  <SelectItem value='openlux'>OpenLux</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className='space-y-1'>
               <Label>{t('Metadata language')}</Label>
               <Select

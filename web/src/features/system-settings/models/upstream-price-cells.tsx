@@ -229,7 +229,23 @@ export function SyncSourcePriceCell(props: {
         </div>
       )}
       <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2'>
-        <div className='min-w-0'>
+        <div className='min-w-0 space-y-3'>
+          {context.sourceCosts?.[props.source]?.[model] && (
+            <div className='space-y-1'>
+              <p className='text-muted-foreground text-xs'>
+                {t('Upstream cost')}
+              </p>
+              <SyncPriceCell
+                values={{
+                  billing_mode: 'tiered_expr',
+                  billing_expr: context.sourceCosts[props.source][model],
+                }}
+              />
+              <p className='text-muted-foreground pt-2 text-xs'>
+                {t('Selling price')}
+              </p>
+            </div>
+          )}
           <SyncPriceCell
             values={result?.values ?? values}
             compareTo={props.row.prices.current}

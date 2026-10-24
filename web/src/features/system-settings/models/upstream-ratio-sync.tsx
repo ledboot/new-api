@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { StaticDataTable } from '@/components/data-table'
 import { ErrorState } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -45,8 +46,14 @@ import {
 } from '@/lib/server-error-message'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
-import { fetchUpstreamRatios, getUpstreamChannels } from '../api'
+import {
+  fetchUpstreamRatios,
+  getUpstreamChannels,
+  publishOpenLuxPricing,
+} from '../api'
 import type {
+  OpenLuxSource,
+  OpenLuxQuote,
   DifferencesMap,
   PricingSyncModels,
   PricingSyncValues,
@@ -67,6 +74,7 @@ import {
   OPENROUTER_CHANNEL_TYPE,
   OPENROUTER_ENDPOINT,
 } from './constants'
+import { OpenLuxSourceDialog } from './openlux-source-dialog'
 import { PriceAdjustmentSelect } from './price-adjustment-select'
 import {
   adjustSyncPrice,
@@ -88,6 +96,7 @@ function getDefaultEndpointForChannel(channel: UpstreamChannel): string {
 }
 
 type SyncPreview = {
+  openlux?: { channel_id: number; source: OpenLuxSource }
   conflicts: ConflictItem[]
   changes: ModelPricingChange[]
   resolutions: Record<string, PricingSyncValues>
@@ -105,6 +114,14 @@ export function UpstreamRatioSync() {
   const rate = isValidPricingCurrency(currency) ? currency.exchangeRate : null
   const [pricingBaseline, setPricingBaseline] =
     useState<ModelPricingConfig | null>(null)
+  const [openLuxDialogOpen, setOpenLuxDialogOpen] = useState(false)
+  const [openLuxSource, setOpenLuxSource] = useState<{
+    channel_id: number
+    source: OpenLuxSource
+  } | null>(null)
+  const [openLuxQuotes, setOpenLuxQuotes] = useState<
+    Record<string, OpenLuxQuote>
+  >({})
   const [channelDialogOpen, setChannelDialogOpen] = useState(false)
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false)
   const [selectedChannelIds, setSelectedChannelIds] = useState<number[]>([])
@@ -141,7 +158,7 @@ export function UpstreamRatioSync() {
   const { data: channelsData } = useQuery({
     queryKey: ['upstream-channels'],
     queryFn: async () => requireServerSuccess(await getUpstreamChannels()),
-    enabled: channelDialogOpen,
+    enabled: channelDialogOpen || openLuxDialogOpen,
   })
   const channels = useMemo(() => channelsData?.data ?? [], [channelsData?.data])
   useEffect(() => {
@@ -180,6 +197,7 @@ export function UpstreamRatioSync() {
       if (!response.success || !response.data?.prices) {
         throw createServerError(response, t('Failed to fetch upstream prices'))
       }
+      setOpenLuxQuotes(response.data.openlux ?? {})
       const results = response.data.test_results
       if (
         results.length &&
@@ -189,7 +207,7 @@ export function UpstreamRatioSync() {
           results
             .map(
               (result) =>
-                `${getUpstreamDisplayName(result.name, t)}: ${result.error}`
+                `${getUpstreamDisplayName(result.name, t)}: ${t(result.error ?? '')}`
             )
             .join(', ')
         )
@@ -200,6 +218,7 @@ export function UpstreamRatioSync() {
       setPrices({})
       setDifferences({})
       setSelections({})
+      setOpenLuxQuotes({})
     },
     onSuccess: (response) => {
       const errors = response.data.test_results.filter(
@@ -211,7 +230,7 @@ export function UpstreamRatioSync() {
             errorMsg: errors
               .map(
                 (result) =>
-                  `${getUpstreamDisplayName(result.name, t)}: ${result.error}`
+                  `${getUpstreamDisplayName(result.name, t)}: ${t(result.error ?? '')}`
               )
               .join(', '),
           })
@@ -228,7 +247,16 @@ export function UpstreamRatioSync() {
   })
   const syncMutation = useMutation({
     mutationFn: async (confirmed: SyncPreview) => {
-      await saveModelPricing(confirmed.changes)
+      if (confirmed.openlux) {
+        requireServerSuccess(
+          await publishOpenLuxPricing({
+            ...confirmed.openlux,
+            changes: confirmed.changes,
+          })
+        )
+      } else {
+        await saveModelPricing(confirmed.changes)
+      }
       return confirmed.resolutions
     },
     onSuccess: async (saved) => {
@@ -254,7 +282,42 @@ export function UpstreamRatioSync() {
     onError: (error: Error) =>
       handleServerError(error, t('Failed to sync prices')),
   })
+  const handleConfirmOpenLux = async (
+    channel: UpstreamChannel,
+    source: OpenLuxSource
+  ) => {
+    setLoadingBaseline(true)
+    setPricingBaseline(null)
+    setPrices({})
+    setSelections({})
+    setDifferences({})
+    setOpenLuxQuotes({})
+    setOpenLuxSource({ channel_id: channel.id, source })
+    syncMutation.reset()
+    try {
+      setPricingBaseline(await getModelPricing())
+      fetchMutation.mutate({
+        upstreams: [
+          {
+            id: channel.id,
+            name: `${channel.name} · OpenLux ${source.group} × ${source.multiplier}`,
+            base_url: channel.base_url,
+            endpoint: 'openlux',
+          },
+        ],
+        openlux: { [channel.id]: source },
+        timeout: 30,
+        include_unchanged: true,
+      })
+    } catch (error) {
+      handleServerError(error, t('Failed to load model pricing'))
+    } finally {
+      setLoadingBaseline(false)
+    }
+  }
   const handleConfirmChannelSelection = async (selectedIds: number[]) => {
+    setOpenLuxSource(null)
+    setOpenLuxQuotes({})
     const selected = channels.filter((channel) =>
       selectedIds.includes(channel.id)
     )
@@ -308,6 +371,7 @@ export function UpstreamRatioSync() {
   }, [])
   const handleAdjustPrices = useCallback(
     (models: string[], adjustment: PriceAdjustment) => {
+      if (openLuxSource) return
       setSelections((previous) => {
         const next = { ...previous }
         for (const model of models) {
@@ -316,7 +380,7 @@ export function UpstreamRatioSync() {
         return next
       })
     },
-    []
+    [openLuxSource]
   )
   const handleApplySync = () => {
     if (!pricingBaseline || hasAdjustmentErrors) return
@@ -360,6 +424,7 @@ export function UpstreamRatioSync() {
       // Freeze the exact save payload and its preview together. Changes to the
       // site exchange rate while this dialog is open cannot change the charge.
       setPreview({
+        openlux: openLuxSource ?? undefined,
         conflicts,
         resolutions,
         changes: buildPricingChanges(
@@ -384,7 +449,10 @@ export function UpstreamRatioSync() {
     loadingBaseline || fetchMutation.isPending || syncMutation.isPending
   const selectedModels = Object.keys(selections)
   const batchAdjustmentDisabled =
-    isLoading || selectedModels.length === 0 || rate === null
+    isLoading ||
+    selectedModels.length === 0 ||
+    rate === null ||
+    Boolean(openLuxSource)
   return (
     <div className='flex h-full min-h-0 flex-col gap-3'>
       <div className='flex shrink-0 flex-wrap items-center gap-2'>
@@ -392,7 +460,11 @@ export function UpstreamRatioSync() {
           value={null}
           currency={currency}
           label={t('Set selected prices')}
-          disabled={isLoading || !Object.keys(selections).length}
+          disabled={
+            isLoading ||
+            !Object.keys(selections).length ||
+            Boolean(openLuxSource)
+          }
           onChange={(mode) => handleAdjustPrices(Object.keys(selections), mode)}
         />
         <span className='text-muted-foreground text-xs'>
@@ -404,6 +476,35 @@ export function UpstreamRatioSync() {
             : t('A valid site exchange rate is required.')}
         </span>
       </div>
+      {Object.values(openLuxQuotes).some(
+        (quote) => Object.keys(quote.excluded).length > 0
+      ) && (
+        <div
+          className='max-h-36 shrink-0 overflow-auto'
+          aria-label={t('Excluded OpenLux models')}
+        >
+          <StaticDataTable
+            columns={[
+              {
+                id: 'model',
+                header: t('Model'),
+                cell: (row: { model: string; reason: string }) => row.model,
+              },
+              {
+                id: 'reason',
+                header: t('Reason'),
+                cell: (row: { model: string; reason: string }) => t(row.reason),
+              },
+            ]}
+            data={Object.values(openLuxQuotes).flatMap((quote) =>
+              Object.entries(quote.excluded).map(([model, reason]) => ({
+                model,
+                reason,
+              }))
+            )}
+          />
+        </div>
+      )}
       <div className='min-h-0 flex-1'>
         {fetchMutation.isError ? (
           <ErrorState
@@ -412,7 +513,9 @@ export function UpstreamRatioSync() {
               <Button
                 variant='outline'
                 onClick={() =>
-                  void handleConfirmChannelSelection(selectedChannelIds)
+                  openLuxSource
+                    ? setOpenLuxDialogOpen(true)
+                    : void handleConfirmChannelSelection(selectedChannelIds)
                 }
               >
                 {t('Retry')}
@@ -422,22 +525,37 @@ export function UpstreamRatioSync() {
         ) : (
           <UpstreamRatioSyncTable
             toolbar={
-              <Button
-                variant='outline'
-                onClick={() => setChannelDialogOpen(true)}
-                disabled={isLoading}
-              >
-                <RefreshCcw className='size-4' aria-hidden />
-                {t('Select price sources')}
-              </Button>
+              <>
+                <Button
+                  variant='outline'
+                  disabled={isLoading}
+                  onClick={() => setOpenLuxDialogOpen(true)}
+                >
+                  {t('OpenLux pricing source')}
+                </Button>
+                <Button
+                  variant='outline'
+                  onClick={() => setChannelDialogOpen(true)}
+                  disabled={isLoading}
+                >
+                  <RefreshCcw className='size-4' aria-hidden />
+                  {t('Select price sources')}
+                </Button>
+              </>
             }
             prices={prices}
+            sourceCosts={Object.fromEntries(
+              Object.entries(openLuxQuotes).map(([name, quote]) => [
+                name,
+                quote.costs,
+              ])
+            )}
             differences={differences}
             selectedSources={selectedSources}
             adjustments={adjustments}
             adjustedPrices={adjustedPrices}
             currency={currency}
-            onAdjustPrices={handleAdjustPrices}
+            onAdjustPrices={openLuxSource ? undefined : handleAdjustPrices}
             isDisabled={isLoading}
             isSyncing={fetchMutation.isPending || loadingBaseline}
             onSelectPrices={handleSelectPrices}
@@ -517,6 +635,14 @@ export function UpstreamRatioSync() {
           {t('Apply Sync')}
         </Button>
       </div>
+      <OpenLuxSourceDialog
+        open={openLuxDialogOpen}
+        onOpenChange={setOpenLuxDialogOpen}
+        channels={channels}
+        onConfirm={(channel, source) =>
+          void handleConfirmOpenLux(channel, source)
+        }
+      />
       <ChannelSelectorDialog
         open={channelDialogOpen}
         onOpenChange={setChannelDialogOpen}
@@ -546,7 +672,8 @@ export function UpstreamRatioSync() {
           setDifferences({})
           setPricingBaseline(null)
           syncMutation.reset()
-          setChannelDialogOpen(true)
+          if (openLuxSource) setOpenLuxDialogOpen(true)
+          else setChannelDialogOpen(true)
         }}
       />
     </div>

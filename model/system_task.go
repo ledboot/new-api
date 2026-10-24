@@ -16,6 +16,7 @@ const (
 	SystemTaskStatusSucceeded SystemTaskStatus = "succeeded"
 	SystemTaskStatusFailed    SystemTaskStatus = "failed"
 
+	SystemTaskTypeOpenLuxSync    = "openlux_sync"
 	SystemTaskTypeLogCleanup     = "log_cleanup"
 	SystemTaskTypeChannelTest    = "channel_test"
 	SystemTaskTypeModelUpdate    = "model_update"

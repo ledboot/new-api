@@ -220,6 +220,7 @@ export type MetadataSyncSelection = {
   fields: MetadataSyncField[]
 }
 export type MetadataSyncRequest = {
+  source?: SyncSource
   locale: SyncLocale
   source_version: string
   selections: MetadataSyncSelection[]
@@ -340,7 +341,7 @@ export type SyncLocale = 'zh' | 'zh-CN' | 'en' | 'ja'
 /**
  * Sync upstream source
  */
-export type SyncSource = 'official'
+export type SyncSource = 'official' | 'openlux'
 
 // ============================================================================
 // Model Deployments Types

@@ -702,3 +702,35 @@ describe('metadata sync preview', () => {
     client.clear()
   })
 })
+
+it('loads OpenLux metadata through the selected source and clears the previous preview when switching', async () => {
+  const get = vi
+    .spyOn(api, 'get')
+    .mockResolvedValue({ data: { success: true, data: preview } })
+  const post = vi.spyOn(api, 'post')
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  render(
+    <QueryClientProvider client={client}>
+      <SyncWizardDialog open onOpenChange={() => {}} />
+    </QueryClientProvider>
+  )
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('combobox', { name: 'Metadata source' }))
+  await user.click(await screen.findByRole('option', { name: 'OpenLux' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Load metadata preview' })
+  )
+  await screen.findByRole('checkbox', { name: 'Select new-model' })
+  expect(get).toHaveBeenCalledWith(
+    '/api/models/sync_upstream/preview?locale=zh&source=openlux'
+  )
+  await user.click(screen.getByRole('combobox', { name: 'Metadata source' }))
+  await user.click(await screen.findByRole('option', { name: 'Official' }))
+  expect(
+    screen.queryByRole('checkbox', { name: 'Select new-model' })
+  ).not.toBeInTheDocument()
+  expect(post).not.toHaveBeenCalled()
+  client.clear()
+})

@@ -1180,15 +1180,13 @@ it('disables both batch shortcuts when the configured exchange rate becomes inva
     })
   )
   await act(async () =>
-    useSystemConfigStore
-      .getState()
-      .setConfig({
-        currency: {
-          ...DEFAULT_CURRENCY_CONFIG,
-          quotaDisplayType: 'CNY',
-          usdExchangeRate: 0,
-        },
-      })
+    useSystemConfigStore.getState().setConfig({
+      currency: {
+        ...DEFAULT_CURRENCY_CONFIG,
+        quotaDisplayType: 'CNY',
+        usdExchangeRate: 0,
+      },
+    })
   )
   expect(
     screen.getByRole('button', { name: /Multiply by exchange rate/ })
@@ -1196,4 +1194,193 @@ it('disables both batch shortcuts when the configured exchange rate becomes inva
   expect(
     screen.getByRole('button', { name: /Divide by exchange rate/ })
   ).toBeDisabled()
+})
+
+it('requires a verified OpenLux unit and fixed group, previews cost separately and publishes only after confirmation', async () => {
+  const sale = 'tier("openlux_1", p * 1.2 + c * 6 + cr * 0.12)'
+  const sourceName = 'OpenLux channel · OpenLux paid × 1.2(7)'
+  vi.spyOn(api, 'get').mockImplementation(async (url) => {
+    if (url === '/api/ratio_sync/channels') {
+      return {
+        data: {
+          success: true,
+          data: [
+            {
+              id: 7,
+              name: 'OpenLux channel',
+              base_url: 'https://www.openlux.ai',
+              status: 1,
+              type: 1,
+            },
+          ],
+        },
+      }
+    }
+    if (url === '/api/ratio_sync/openlux') {
+      return {
+        data: {
+          success: true,
+          data: {
+            version: 'quote-v1',
+            groups: { paid: 'Paid', standard: 'Standard' },
+            ratios: { paid: 0.1, standard: 1 },
+            account_rates: false,
+            model_count: 2,
+            fetched_at: 1,
+          },
+        },
+      }
+    }
+    return {
+      data: {
+        success: true,
+        data: {
+          entries: [],
+          empty_version: 'empty',
+          options: pricingOptions({}),
+        },
+      },
+    }
+  })
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data:
+        url === '/api/ratio_sync/fetch'
+          ? {
+              prices: {
+                'openlux-text': {
+                  current: {},
+                  upstreams: {
+                    [sourceName]: {
+                      billing_mode: 'tiered_expr',
+                      billing_expr: sale,
+                    },
+                  },
+                },
+              },
+              differences: {},
+              test_results: [{ name: sourceName, status: 'success' }],
+              openlux: {
+                [sourceName]: {
+                  version: 'quote-v1',
+                  channel_id: 7,
+                  group: 'paid',
+                  ratio_unit: 2,
+                  multiplier: 1.2,
+                  account_rates: false,
+                  fetched_at: 1,
+                  costs: {
+                    'openlux-text':
+                      'tier("openlux_1", p * 1 + c * 5 + cr * 0.1)',
+                  },
+                  excluded: {
+                    'video-model':
+                      'Only explicit text token pricing is supported',
+                  },
+                },
+              },
+            }
+          : { published: 1 },
+    },
+  }))
+  const patch = vi.spyOn(api, 'patch')
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  render(
+    <QueryClientProvider client={client}>
+      <UpstreamRatioSync />
+    </QueryClientProvider>
+  )
+  const user = userEvent.setup()
+  await user.click(
+    screen.getByRole('button', { name: 'OpenLux pricing source' })
+  )
+  const dialog = await screen.findByRole('dialog', {
+    name: 'OpenLux pricing source',
+  })
+  const controls = within(dialog)
+  await user.click(controls.getByRole('combobox', { name: 'Channel' }))
+  await user.click(
+    await screen.findByRole('option', { name: 'OpenLux channel' })
+  )
+  await user.click(
+    controls.getByRole('combobox', { name: 'OpenLux upstream group' })
+  )
+  await user.click(await screen.findByRole('option', { name: 'Paid' }))
+  expect(
+    controls.getByRole('button', { name: 'Preview prices' })
+  ).toBeDisabled()
+  await user.type(controls.getByLabelText('USD per 1M tokens at ratio 1'), '2')
+  await user.click(
+    controls.getByRole('checkbox', {
+      name: 'I verified that every API key in this channel is fixed to the selected upstream group.',
+    })
+  )
+  await user.click(
+    controls.getByRole('combobox', { name: 'OpenLux upstream group' })
+  )
+  await user.click(await screen.findByRole('option', { name: 'Standard' }))
+  expect(controls.getByRole('checkbox')).not.toBeChecked()
+  await user.click(
+    controls.getByRole('combobox', { name: 'OpenLux upstream group' })
+  )
+  await user.click(await screen.findByRole('option', { name: 'Paid' }))
+  await user.click(controls.getByRole('checkbox'))
+  await user.click(controls.getByRole('button', { name: 'Preview prices' }))
+  const select = await screen.findByRole('checkbox', {
+    name: `Select price for openlux-text from ${sourceName}`,
+  })
+  expect(screen.getByText('Upstream cost')).toBeVisible()
+  expect(screen.getByText('Selling price')).toBeVisible()
+  expect(screen.getByText('video-model')).toBeVisible()
+  expect(post).toHaveBeenCalledWith(
+    '/api/ratio_sync/fetch',
+    expect.objectContaining({
+      openlux: {
+        7: {
+          group: 'paid',
+          ratio_unit: 2,
+          multiplier: 1.2,
+          version: 'quote-v1',
+          key_group_confirmed: true,
+        },
+      },
+    })
+  )
+  expect(patch).not.toHaveBeenCalled()
+  await user.click(select)
+  expect(
+    screen.getByRole('combobox', { name: 'Set selected prices' })
+  ).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Apply Sync' }))
+  expect(
+    post.mock.calls.filter(([url]) => url === '/api/ratio_sync/openlux/publish')
+  ).toHaveLength(0)
+  const confirmation = await screen.findByRole('alertdialog', {
+    name: 'Preview price changes',
+  })
+  await user.click(
+    within(confirmation).getByRole('button', { name: 'Confirm Changes' })
+  )
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledWith(
+      '/api/ratio_sync/openlux/publish',
+      expect.objectContaining({
+        channel_id: 7,
+        source: expect.objectContaining({ group: 'paid', version: 'quote-v1' }),
+        changes: [
+          expect.objectContaining({
+            model_name: 'openlux-text',
+            pricing: expect.objectContaining({
+              'billing_setting.billing_expr': sale,
+            }),
+          }),
+        ],
+      })
+    )
+  )
+  expect(patch).not.toHaveBeenCalled()
+  client.clear()
 })

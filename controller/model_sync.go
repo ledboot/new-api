@@ -252,10 +252,16 @@ type metadataSyncCandidate struct {
 	VendorToCreate string                `json:"vendor_to_create,omitempty"`
 }
 
-func fetchMetadataCatalog(c *gin.Context, locale string) (metadataSyncSource, map[string]model.MetadataValues, map[string]model.Vendor, error) {
+func fetchMetadataCatalog(c *gin.Context, locale string, sources ...string) (metadataSyncSource, map[string]model.MetadataValues, map[string]model.Vendor, error) {
 	resolved, valid := normalizeLocale(locale)
 	if !valid {
 		return metadataSyncSource{}, nil, nil, errors.New("unsupported metadata language")
+	}
+	if len(sources) > 0 && sources[0] == "openlux" {
+		return openLuxMetadata(c.Request.Context(), resolved)
+	}
+	if len(sources) > 0 && sources[0] != "" && sources[0] != "official" {
+		return metadataSyncSource{}, nil, nil, common.NewMessage("Invalid request parameter format")
 	}
 	modelsURL, vendorsURL := getUpstreamURLs(resolved)
 	source := metadataSyncSource{Locale: resolved, ModelsURL: modelsURL, VendorsURL: vendorsURL}
@@ -315,7 +321,7 @@ func fetchMetadataCatalog(c *gin.Context, locale string) (metadataSyncSource, ma
 }
 
 func SyncUpstreamPreview(c *gin.Context) {
-	source, upstream, upstreamVendors, err := fetchMetadataCatalog(c, c.Query("locale"))
+	source, upstream, upstreamVendors, err := fetchMetadataCatalog(c, c.Query("locale"), c.Query("source"))
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -412,6 +418,7 @@ func SyncUpstreamPreview(c *gin.Context) {
 
 func SyncUpstreamModels(c *gin.Context) {
 	var request struct {
+		Source        string                        `json:"source"`
 		Locale        string                        `json:"locale"`
 		SourceVersion string                        `json:"source_version"`
 		Selections    []model.MetadataSyncSelection `json:"selections"`
@@ -420,7 +427,7 @@ func SyncUpstreamModels(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Preview and select metadata changes before applying"})
 		return
 	}
-	source, upstream, vendors, err := fetchMetadataCatalog(c, request.Locale)
+	source, upstream, vendors, err := fetchMetadataCatalog(c, request.Locale, request.Source)
 	if err != nil {
 		common.ApiError(c, err)
 		return

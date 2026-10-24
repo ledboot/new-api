@@ -251,6 +251,7 @@ export function describeSyncPrice(
 }
 
 export type SyncPriceSelectionContext = {
+  sourceCosts?: Record<string, Record<string, string>>
   bulkStates: Record<
     string,
     { selections: PricingSourceSelection[]; selectedModels: string[] }

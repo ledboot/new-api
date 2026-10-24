@@ -467,6 +467,7 @@ export type UpstreamConfig = {
 }
 
 export type FetchUpstreamRatiosRequest = {
+  openlux?: Record<number, OpenLuxSource>
   include_unchanged?: boolean
   upstreams: UpstreamConfig[]
   timeout: number
@@ -482,8 +483,38 @@ export type UpstreamRatiosResponse = {
   success: boolean
   message: string
   data: {
+    openlux?: Record<string, OpenLuxQuote>
     differences: DifferencesMap
     prices: PricingSyncModels
     test_results: TestResult[]
   }
+}
+
+export type OpenLuxSource = {
+  group: string
+  ratio_unit: number
+  multiplier: number
+  version: string
+  key_group_confirmed: boolean
+}
+
+export type OpenLuxQuote = {
+  version: string
+  fetched_at: number
+  group: string
+  channel_id: number
+  account_rates: boolean
+  ratio_unit: number
+  multiplier: number
+  costs: Record<string, string>
+  excluded: Record<string, string>
+}
+
+export type OpenLuxCatalog = {
+  version: string
+  fetched_at: number
+  groups: Record<string, string>
+  ratios: Record<string, number>
+  model_count: number
+  account_rates: boolean
 }

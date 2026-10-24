@@ -371,6 +371,9 @@ func UpdateOptionsBulk(values map[string]string) error {
 }
 
 func updateOptionMap(key string, value string) (err error) {
+	if key == OpenLuxSnapshotOption {
+		return nil
+	}
 	if key == retiredThemeOptionKey || key == legacyAccessTokenRetireAtKey {
 		common.OptionMapRWMutex.Lock()
 		delete(common.OptionMap, key)

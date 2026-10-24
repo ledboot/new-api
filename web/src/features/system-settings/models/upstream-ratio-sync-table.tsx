@@ -62,6 +62,7 @@ export type PricingSyncRow = {
   differences: DifferencesMap[string]
 }
 type UpstreamRatioSyncTableProps = {
+  sourceCosts?: Record<string, Record<string, string>>
   prices: PricingSyncModels
   adjustments?: Record<string, PriceAdjustment>
   adjustedPrices?: Record<string, AdjustedSyncPrice>
@@ -224,6 +225,7 @@ export function UpstreamRatioSyncTable(props: UpstreamRatioSyncTableProps) {
     <SyncPriceContext.Provider
       value={{
         bulkStates,
+        sourceCosts: props.sourceCosts,
         selectedSources: props.selectedSources,
         adjustments: props.adjustments ?? {},
         adjustedPrices: props.adjustedPrices ?? {},
