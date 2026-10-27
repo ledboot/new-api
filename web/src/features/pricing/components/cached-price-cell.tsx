@@ -59,6 +59,7 @@ export function CachedPriceCell(props: {
         showRechargePrice,
         priceRate,
         usdExchangeRate,
+        selectedGroup,
         groupRatioMultiplier: getDynamicDisplayGroupRatio(model, selectedGroup),
       }),
     // Currency is read indirectly by the price formatter.

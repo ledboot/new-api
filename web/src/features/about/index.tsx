@@ -174,7 +174,7 @@ export function About() {
 
   return (
     <PublicLayout>
-      <div className='mx-auto max-w-6xl px-4 py-8'>
+      <div className='mx-auto site-container px-4 py-8'>
         <RichContent
           mode='markdown'
           content={rawContent}

@@ -83,6 +83,10 @@ export type PricingModel = {
   billing_mode?: string
   /** Raw expression describing dynamic / tiered billing */
   billing_expr?: string
+  group_billing_expr?: Record<string, string>
+  group_input_token_limits?: Record<string, number>
+  /** Display-only upstream context limit for the selected group. */
+  input_token_limit?: number
   /** Task-plugin usage facts and their billing units. */
   billing_usage_schema?: BillingUsageSchema
   /** Display-only labeled usage vectors for pricing examples. */

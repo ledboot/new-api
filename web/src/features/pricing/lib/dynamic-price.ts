@@ -51,6 +51,7 @@ export type DynamicPriceOptions = {
   showRechargePrice?: boolean
   priceRate?: number
   usdExchangeRate?: number
+  selectedGroup?: string
   groupRatioMultiplier?: number
   usageSchema?: BillingUsageSchema
   now?: Date
@@ -142,6 +143,7 @@ function isTaskPricingTier(tier: DynamicPricingTier): tier is ParsedTaskTier {
 }
 
 export function isDynamicPricingModel(model: PricingModel): boolean {
+  if (Object.keys(model.group_billing_expr ?? {}).length) return true
   if (model.billing_plugin_variants?.length) {
     return model.billing_plugin_variants.some(
       (variant) =>
@@ -390,6 +392,92 @@ export function getDynamicPricingSummary(
   model: PricingModel,
   options: DynamicPriceOptions
 ): DynamicPricingSummary | null {
+  const groupExpressions = Object.entries(
+    model.group_billing_expr ?? {}
+  ).filter(([group]) => model.enable_groups.includes(group))
+  if (groupExpressions.length) {
+    const selected = groupExpressions.filter(
+      ([group]) => group === options.selectedGroup
+    )
+    if (
+      options.selectedGroup &&
+      options.selectedGroup !== 'all' &&
+      !selected.length
+    ) {
+      return getDynamicPricingSummary(
+        { ...model, group_billing_expr: undefined },
+        options
+      )
+    }
+    const candidates = selected.length ? selected : groupExpressions
+    const groupSummaries = candidates.flatMap(([group, expression]) => {
+      const ratio = model.group_ratio?.[group] ?? 1
+      const summary = getDynamicPricingSummary(
+        {
+          ...model,
+          group_billing_expr: undefined,
+          billing_mode: 'tiered_expr',
+          billing_expr: expression,
+          billing_plugin_variants: undefined,
+        },
+        { ...options, groupRatioMultiplier: ratio }
+      )
+      return summary ? [{ group, summary }] : []
+    })
+    const summaries = groupSummaries.map((item) => item.summary)
+    const first = summaries[0]
+    if (!first) return null
+    const ranges = new Map<
+      string,
+      { entry: DynamicPriceEntry; min: number; max: number }
+    >()
+    groupSummaries.forEach(({ group, summary }) => {
+      const ratio = model.group_ratio?.[group] ?? 1
+      for (const entry of summary.entries) {
+        const key = `${entry.field}:${entry.unit}`
+        const range = ranges.get(key)
+        const value = entry.value * ratio
+        ranges.set(key, {
+          entry,
+          min: Math.min(range?.min ?? Infinity, value),
+          max: Math.max(range?.max ?? -Infinity, value),
+        })
+      }
+    })
+    const entries = [...ranges.values()].map(({ entry, min, max }) => {
+      const formatter =
+        entry.unit === 'token'
+          ? formatDynamicUnitPrice
+          : formatTaskUsageUnitPrice
+      const displayOptions = { ...options, groupRatioMultiplier: 1 }
+      return {
+        ...entry,
+        value: min,
+        minValue: min,
+        maxValue: max,
+        formatted: formatter(min, displayOptions),
+        formattedRange:
+          min === max
+            ? undefined
+            : `${formatter(min, displayOptions)} – ${formatter(max, displayOptions)}`,
+      }
+    })
+    return {
+      ...first,
+      tiers: summaries.flatMap((summary) => summary.tiers),
+      entries,
+      primaryEntries: entries.filter((entry) =>
+        first.primaryEntries.some(
+          (candidate) => candidate.field === entry.field
+        )
+      ),
+      secondaryEntries: entries.filter((entry) =>
+        first.secondaryEntries.some(
+          (candidate) => candidate.field === entry.field
+        )
+      ),
+    }
+  }
   const variants = model.billing_plugin_variants
   if (variants?.length) {
     const summaries = variants.flatMap((variant) => {

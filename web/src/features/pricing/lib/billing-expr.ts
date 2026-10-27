@@ -293,6 +293,70 @@ export type ParsedTaskTier = {
   unitPrices: Record<string, number>
 }
 
+// OpenLux labels are internal identifiers; the expression supplies the real bounds.
+export function formatOpenLuxTierRange(
+  tier: ParsedTier | ParsedTaskTier,
+  tiers: readonly (ParsedTier | ParsedTaskTier)[],
+  unlimitedLabel: string,
+  inputTokenLimit?: number
+): string | null {
+  if (!/^openlux_\d+$/.test(tier.label) || tier.conditionText) return null
+  const index = tiers.indexOf(tier)
+  if (index < 0) return null
+  const conditions = [...tier.conditions]
+  // The parser stores each branch's own condition. Later branches also exclude
+  // every preceding branch; the final fallback has no explicit condition.
+  for (const previous of tiers.slice(0, index)) {
+    if (previous.conditionText || previous.conditions.length !== 1) return null
+    const bound = previous.conditions[0]
+    if (
+      !('var' in bound) ||
+      bound.var !== 'len' ||
+      !['<', '<='].includes(bound.op)
+    ) {
+      return null
+    }
+    conditions.push({
+      var: 'len',
+      op: bound.op === '<=' ? '>' : '>=',
+      value: bound.value,
+    })
+  }
+  let lower = 0
+  const upperLimit = inputTokenLimit ?? Infinity
+  const hasInputLimit = Number.isSafeInteger(upperLimit) && upperLimit > 0
+  let upper = hasInputLimit ? upperLimit : Infinity
+  let lowerClosed = true
+  let upperClosed = hasInputLimit
+  for (const condition of conditions) {
+    if (
+      !('var' in condition) ||
+      condition.var !== 'len' ||
+      !Number.isFinite(condition.value)
+    ) {
+      return null
+    }
+    if (condition.op === '>' || condition.op === '>=') {
+      if (condition.value > lower) {
+        lower = condition.value
+        lowerClosed = condition.op === '>='
+      } else if (condition.value === lower && condition.op === '>') {
+        lowerClosed = false
+      }
+    } else if (condition.value < upper) {
+      upper = condition.value
+      upperClosed = condition.op === '<='
+    } else if (condition.value === upper && condition.op === '<') {
+      upperClosed = false
+    }
+  }
+  if (lower > upper || (lower === upper && (!lowerClosed || !upperClosed))) {
+    return null
+  }
+  if (lower === 0 && lowerClosed && upper === Infinity) return unlimitedLabel
+  return `${lowerClosed ? '[' : '('}${lower}, ${Number.isFinite(upper) ? upper : '∞'}${upperClosed ? ']' : ')'}`
+}
+
 // ---------------------------------------------------------------------------
 // Tier parser
 // ---------------------------------------------------------------------------

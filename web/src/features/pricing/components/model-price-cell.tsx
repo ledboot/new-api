@@ -65,6 +65,7 @@ export function ModelPriceCell(props: {
         now: billingTime === undefined ? undefined : new Date(billingTime),
         tokenUnit,
         showCurrencySymbol: false,
+        selectedGroup: options.selectedGroup,
         groupRatioMultiplier: getDynamicDisplayGroupRatio(
           props.model,
           options.selectedGroup

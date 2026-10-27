@@ -83,10 +83,13 @@ function isMetadataSyncable(item: MetadataSyncCandidate) {
 export function SyncWizardDialog(props: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialSource?: SyncSource
 }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const [source, setSource] = useState<SyncSource>('official')
+  const [source, setSource] = useState<SyncSource>(
+    props.initialSource ?? 'official'
+  )
   const [locale, setLocale] = useState<SyncLocale>('zh')
   const [preview, setPreview] = useState<MetadataSyncPreview | null>(null)
   const [scope, setScope] = useState('site')
@@ -147,6 +150,7 @@ export function SyncWizardDialog(props: {
 
   useEffect(() => {
     if (props.open) {
+      if (props.initialSource) setSource(props.initialSource)
       setPreview(null)
       setSelection({})
       setStep(0)
@@ -159,7 +163,7 @@ export function SyncWizardDialog(props: {
     }
     // Reset only when the dialog opens; mutation objects change on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.open])
+  }, [props.open, props.initialSource])
 
   const filteredCandidates = useMemo(() => {
     const keyword = search.trim().toLowerCase()

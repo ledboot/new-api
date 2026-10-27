@@ -53,7 +53,7 @@ export function HowItWorks() {
 
   return (
     <section className='bg-muted/40 relative z-10 border-y px-6 py-16 md:py-20'>
-      <div className='mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-16'>
+      <div className='mx-auto grid site-container items-center gap-10 lg:grid-cols-2 lg:gap-16'>
         <div>
           <AnimateInView className='mb-9'>
             <p className='text-primary mb-3 text-xs font-medium tracking-widest uppercase'>

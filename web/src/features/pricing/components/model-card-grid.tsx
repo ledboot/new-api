@@ -16,19 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { memo, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { getPerfMetricsSummary } from '@/features/performance-metrics/api'
-import { requireServerSuccess } from '@/lib/server-error-message'
 
 import { DEFAULT_PRICING_PAGE_SIZE, DEFAULT_TOKEN_UNIT } from '../constants'
 import type { PricingModel, TokenUnit } from '../types'
 import { ModelCard } from './model-card'
-import type { ModelPerfBadgeData } from './model-perf-badge'
 
 export interface ModelCardGridProps {
   models: PricingModel[]
@@ -54,46 +50,13 @@ export const ModelCardGrid = memo(function ModelCardGrid(
     const start = (currentPage - 1) * pageSize
     return props.models.slice(start, start + pageSize)
   }, [currentPage, pageSize, props.models])
-  const recentModels = pagedModels.map((model) => model.model_name || '')
-  const perfQuery = useQuery({
-    queryKey: ['perf-metrics-summary', 24, recentModels],
-    queryFn: async () =>
-      requireServerSuccess(await getPerfMetricsSummary(24, recentModels)),
-    enabled: recentModels.length > 0,
-    staleTime: 60 * 1000,
-    retry: false,
-  })
-
-  const perfMap = useMemo(() => {
-    const map = new Map<string, ModelPerfBadgeData>()
-    for (const model of perfQuery.data?.data?.models ?? []) {
-      map.set(model.model_name, {
-        ...model,
-        window_start: perfQuery.data?.data.window_start,
-        window_end: perfQuery.data?.data.window_end,
-      })
-    }
-    for (const [name, series] of Object.entries(
-      perfQuery.data?.data?.recent_success_series ?? {}
-    )) {
-      map.set(name, {
-        avg_latency_ms: Number.NaN,
-        avg_tps: Number.NaN,
-        success_rate: Number.NaN,
-        ...map.get(name),
-        recent_success_series: series,
-      })
-    }
-    return map
-  }, [perfQuery.data])
-
   if (props.models.length === 0) {
     return null
   }
 
   return (
     <div className='flex flex-col gap-4 sm:gap-5'>
-      <div className='grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3'>
+      <div className='grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
         {pagedModels.map((model) => (
           <ModelCard
             key={model.id ?? model.model_name}
@@ -103,7 +66,6 @@ export const ModelCardGrid = memo(function ModelCardGrid(
             usdExchangeRate={props.usdExchangeRate}
             showRechargePrice={props.showRechargePrice}
             selectedGroup={props.selectedGroup}
-            perf={perfMap.get(model.model_name || '')}
             onClick={props.onModelClick}
           />
         ))}

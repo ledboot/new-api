@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/performance_setting"
@@ -208,9 +209,17 @@ func loadOptionsFromDatabase() {
 	}()
 	passkeyOptionMutex.Lock()
 	defer passkeyOptionMutex.Unlock()
-	options, _ := AllOption()
+	options, err := AllOption()
+	if err != nil {
+		common.SysLog(common.LogText("failed to load options: %s", err.Error()))
+		return
+	}
+	salesFound := false
 	passkeyOptions := make(map[string]string)
 	for _, option := range options {
+		if option.Key == billing_setting.OpenLuxSalesOption {
+			salesFound = true
+		}
 		if IsPasskeyDomainOption(option.Key) {
 			passkeyOptions[option.Key] = option.Value
 			continue
@@ -219,6 +228,9 @@ func loadOptionsFromDatabase() {
 		if err != nil {
 			common.SysLog(common.LogText("failed to update option map: %s", err.Error()))
 		}
+	}
+	if !salesFound {
+		_ = billing_setting.LoadOpenLuxSales("{}")
 	}
 	applyPasskeyDomainOptions(passkeyOptions)
 }
@@ -232,6 +244,9 @@ func SyncOptions(frequency int) {
 }
 
 func validateOptionValue(key string, value string) error {
+	if key == billing_setting.OpenLuxSalesOption {
+		return common.NewMessage("Use the OpenLux sales workflow to update managed groups")
+	}
 	if key == legacyAccessTokenRetireAtKey {
 		return errLegacyRetireAtReadOnly
 	}
@@ -371,6 +386,9 @@ func UpdateOptionsBulk(values map[string]string) error {
 }
 
 func updateOptionMap(key string, value string) (err error) {
+	if key == billing_setting.OpenLuxSalesOption {
+		return billing_setting.LoadOpenLuxSales(value)
+	}
 	if key == OpenLuxSnapshotOption {
 		return nil
 	}

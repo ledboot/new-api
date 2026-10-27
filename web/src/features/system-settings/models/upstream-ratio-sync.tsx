@@ -18,7 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckSquare, RefreshCcw } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -103,6 +110,12 @@ type SyncPreview = {
   exchangeRateSummary?: string
 }
 
+const OpenLuxSalesDialog = lazy(() =>
+  import('./openlux-sales-dialog').then((module) => ({
+    default: module.OpenLuxSalesDialog,
+  }))
+)
+
 export function UpstreamRatioSync() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -115,6 +128,7 @@ export function UpstreamRatioSync() {
   const [pricingBaseline, setPricingBaseline] =
     useState<ModelPricingConfig | null>(null)
   const [openLuxDialogOpen, setOpenLuxDialogOpen] = useState(false)
+  const [salesOpen, setSalesOpen] = useState(false)
   const [openLuxSource, setOpenLuxSource] = useState<{
     channel_id: number
     source: OpenLuxSource
@@ -456,6 +470,9 @@ export function UpstreamRatioSync() {
   return (
     <div className='flex h-full min-h-0 flex-col gap-3'>
       <div className='flex shrink-0 flex-wrap items-center gap-2'>
+        <Button onClick={() => setSalesOpen(true)}>
+          {t('OpenLux resale')}
+        </Button>
         <PriceAdjustmentSelect
           value={null}
           currency={currency}
@@ -635,6 +652,11 @@ export function UpstreamRatioSync() {
           {t('Apply Sync')}
         </Button>
       </div>
+      {salesOpen && (
+        <Suspense fallback={null}>
+          <OpenLuxSalesDialog open onOpenChange={setSalesOpen} />
+        </Suspense>
+      )}
       <OpenLuxSourceDialog
         open={openLuxDialogOpen}
         onOpenChange={setOpenLuxDialogOpen}

@@ -27,6 +27,7 @@ import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import {
   BILLING_PRICING_VARS,
+  formatOpenLuxTierRange,
   MATCH_CONTAINS,
   MATCH_EQ,
   MATCH_EXISTS,
@@ -521,7 +522,13 @@ export function DynamicPricingBreakdown({
                         variant='secondary'
                         className='bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300'
                       >
-                        {tier.label || t('Default')}
+                        {formatOpenLuxTierRange(
+                          tier,
+                          tiers,
+                          t('No range limit')
+                        ) ||
+                          tier.label ||
+                          t('Default')}
                       </Badge>
                     )}
                     {isMatched && (
@@ -607,7 +614,9 @@ export function DynamicPricingBreakdown({
             columns={[
               {
                 id: 'tier',
-                header: usageSchema ? t('Applicable conditions') : t('Tier'),
+                header: usageSchema
+                  ? t('Applicable conditions')
+                  : t('Input token count'),
                 className: cn(
                   'text-muted-foreground py-2 font-medium',
                   compact && 'h-8'
@@ -640,7 +649,13 @@ export function DynamicPricingBreakdown({
                             variant='secondary'
                             className='bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300'
                           >
-                            {tier.label || t('Default')}
+                            {formatOpenLuxTierRange(
+                              tier,
+                              tiers,
+                              t('No range limit')
+                            ) ||
+                              tier.label ||
+                              t('Default')}
                           </Badge>
                         )}
                         {isMatched && (

@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
@@ -41,6 +41,13 @@ import { requireServerSuccess } from '@/lib/server-error-message'
 
 import { getOpenLuxCatalog } from '../api'
 import type { OpenLuxSource, UpstreamChannel } from '../types'
+import { OpenLuxCatalogBrowser } from './openlux-catalog-browser'
+
+const SyncWizardDialog = lazy(() =>
+  import('@/features/models/components/dialogs/sync-wizard-dialog').then(
+    (module) => ({ default: module.SyncWizardDialog })
+  )
+)
 
 const openLuxSourceSchema = z.object({
   channel_id: z.string().min(1),
@@ -57,6 +64,7 @@ export function OpenLuxSourceDialog(props: {
   onConfirm: (channel: UpstreamChannel, source: OpenLuxSource) => void
 }) {
   const { t } = useTranslation()
+  const [metadataOpen, setMetadataOpen] = useState(false)
   const form = useForm<z.infer<typeof openLuxSourceSchema>>({
     resolver: zodResolver(openLuxSourceSchema),
     mode: 'onChange',
@@ -89,6 +97,9 @@ export function OpenLuxSourceDialog(props: {
       props.channels.filter(
         (channel) =>
           channel.status === 1 &&
+          (channel.type === undefined ||
+            channel.type === 1 ||
+            channel.type === 60) &&
           channel.base_url.replace(/\/+$/, '') === 'https://www.openlux.ai'
       ),
     [props.channels]
@@ -118,7 +129,8 @@ export function OpenLuxSourceDialog(props: {
       description={t(
         'Choose a saved channel and its upstream group, then preview cost and selling prices.'
       )}
-      contentClassName='sm:max-w-xl'
+      contentClassName='sm:max-w-6xl'
+      contentHeight='min(72vh, 850px)'
       footer={
         <>
           <Button variant='outline' onClick={() => props.onOpenChange(false)}>
@@ -155,6 +167,35 @@ export function OpenLuxSourceDialog(props: {
             }
           />
         )}
+        {catalog.data?.catalog && (
+          <OpenLuxCatalogBrowser
+            catalog={catalog.data}
+            unit={
+              Number.isFinite(Number(unit)) && Number(unit) > 0
+                ? Number(unit)
+                : (catalog.data.price_unit ?? 2)
+            }
+            multiplier={
+              Number.isFinite(Number(multiplier)) &&
+              Number(multiplier) >= 1 &&
+              Number(multiplier) <= 1000
+                ? Number(multiplier)
+                : Number.NaN
+            }
+          />
+        )}
+        <div className='flex items-center gap-2'>
+          <Button
+            variant='outline'
+            disabled={catalog.isFetching}
+            onClick={() => void catalog.refetch()}
+          >
+            {t('Refresh source data')}
+          </Button>
+          <Button variant='outline' onClick={() => setMetadataOpen(true)}>
+            {t('Sync model metadata')}
+          </Button>
+        </div>
         <div className='space-y-2'>
           <Label>{t('Channel')}</Label>
           <Select
@@ -231,6 +272,14 @@ export function OpenLuxSourceDialog(props: {
               step='any'
               {...form.register('ratio_unit', { valueAsNumber: true })}
             />
+            {catalog.data?.price_unit && (
+              <p className='text-muted-foreground text-xs'>
+                {t(
+                  'Source reference: {{price}} USD per million tokens at ratio 1',
+                  { price: catalog.data.price_unit }
+                )}
+              </p>
+            )}
             <p className='text-muted-foreground text-xs'>
               {t(
                 'Enter the verified upstream price unit; no currency conversion is assumed.'
@@ -274,6 +323,15 @@ export function OpenLuxSourceDialog(props: {
             'Only supported text models configured on this channel are quoted. Other enabled channels serving the same model must be resolved first. Local user-group multipliers still apply.'
           )}
         </p>
+        {metadataOpen && (
+          <Suspense fallback={<LoadingState />}>
+            <SyncWizardDialog
+              open
+              initialSource='openlux'
+              onOpenChange={setMetadataOpen}
+            />
+          </Suspense>
+        )}
       </div>
     </Dialog>
   )

@@ -52,7 +52,7 @@ export function Hero(props: HeroProps) {
         className='tokara-hero-grid pointer-events-none absolute inset-0'
         aria-hidden='true'
       />
-      <div className='relative mx-auto max-w-6xl text-center'>
+      <div className='relative mx-auto site-container text-center'>
         <Link
           to='/pricing'
           className='border-border bg-background text-muted-foreground inline-flex max-w-full flex-wrap items-center justify-center gap-3 rounded-full border px-4 py-2 text-xs'

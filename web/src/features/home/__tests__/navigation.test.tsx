@@ -85,6 +85,13 @@ describe('Tokara home navigation', () => {
     expect(screen.getByText('Tokara')).toBeVisible()
   })
 
+  it('uses the full site width while preserving mobile page gutters', async () => {
+    await renderHero(false)
+    const heading = await screen.findByRole('heading', { level: 1 })
+    expect(heading.closest('.site-container')).not.toBeNull()
+    expect(heading.closest('section')).toHaveClass('px-5')
+  })
+
   it('keeps the dashboard entry for signed-in users', async () => {
     await renderHero(true)
 

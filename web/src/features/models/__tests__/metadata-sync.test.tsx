@@ -713,12 +713,10 @@ it('loads OpenLux metadata through the selected source and clears the previous p
   })
   render(
     <QueryClientProvider client={client}>
-      <SyncWizardDialog open onOpenChange={() => {}} />
+      <SyncWizardDialog open initialSource='openlux' onOpenChange={() => {}} />
     </QueryClientProvider>
   )
   const user = userEvent.setup()
-  await user.click(screen.getByRole('combobox', { name: 'Metadata source' }))
-  await user.click(await screen.findByRole('option', { name: 'OpenLux' }))
   await user.click(
     screen.getByRole('button', { name: 'Load metadata preview' })
   )

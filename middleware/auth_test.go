@@ -545,15 +545,30 @@ func TestOpenLuxPricingRoutesEnforceRootScopes(t *testing.T) {
 	admin := createMiddlewarePATUser(t, "openlux-admin", "openlux-legacy-admin")
 	require.NoError(t, model.DB.Model(admin).Update("role", common.RoleAdminUser).Error)
 	adminWrite, _ := createMiddlewareScopedToken(t, admin.Id, 0, "option:write")
+	now := common.GetTimestamp()
+	session := &model.UserSession{SID: "openlux-root-session", UserID: root.Id, Version: 1, UserAuthVersion: root.AuthVersion, Status: model.UserSessionStatusActive, RefreshHash: "fixture-refresh-hash", LoginMethod: "password", LastActiveAt: now, ExpiresAt: now + 3600}
+	require.NoError(t, model.CreateUserSession(session))
+	identity := service.AuthIdentity{UserID: root.Id, SessionID: session.SID, UserAuthVersion: session.UserAuthVersion, SessionVersion: session.Version}
+	accessJWT, _, err := service.IssueAccessToken(identity)
+	require.NoError(t, err)
+
 	router := gin.New()
 	ok := func(c *gin.Context) { c.Status(http.StatusNoContent) }
 	router.GET("/api/ratio_sync/openlux", RootAuth(), ok)
 	router.POST("/api/ratio_sync/openlux/publish", RootAuth(), ok)
+	router.POST("/api/ratio_sync/openlux/sales/preview", RootAuth(), ok)
+	router.POST("/api/ratio_sync/openlux/sales/publish", RootAuth(), ok)
 	for _, test := range []struct {
 		name, method, path, token string
 		status                    int
 	}{
 		{"root reads catalog", http.MethodGet, "/api/ratio_sync/openlux", read, http.StatusNoContent},
+		{"root session can preview sales", http.MethodPost, "/api/ratio_sync/openlux/sales/preview", accessJWT, http.StatusNoContent},
+		{"root session can publish sales", http.MethodPost, "/api/ratio_sync/openlux/sales/publish", accessJWT, http.StatusNoContent},
+		{"expired root session cannot publish", http.MethodPost, "/api/ratio_sync/openlux/sales/publish", issueExpiredDashboardAccessToken(t, identity), http.StatusUnauthorized},
+		{"PAT cannot preview credential-bearing sales", http.MethodPost, "/api/ratio_sync/openlux/sales/preview", write, http.StatusForbidden},
+		{"PAT cannot publish sales", http.MethodPost, "/api/ratio_sync/openlux/sales/publish", write, http.StatusForbidden},
+		{"anonymous cannot publish sales", http.MethodPost, "/api/ratio_sync/openlux/sales/publish", "", http.StatusUnauthorized},
 		{"root publishes prices", http.MethodPost, "/api/ratio_sync/openlux/publish", write, http.StatusNoContent},
 		{"read scope cannot publish", http.MethodPost, "/api/ratio_sync/openlux/publish", read, http.StatusForbidden},
 		{"write scope cannot read", http.MethodGet, "/api/ratio_sync/openlux", write, http.StatusForbidden},

@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 )
 
@@ -79,6 +81,9 @@ type openLuxVendor struct {
 }
 
 type openLuxCatalog struct {
+	// Raw retains provider fields that are not yet supported for local billing.
+	// It is returned only by the administrator catalog endpoint, never imported as pricing.
+	Raw         map[string]json.RawMessage    `json:"-"`
 	Success     bool                          `json:"success"`
 	Models      []openLuxModel                `json:"data"`
 	Vendors     []openLuxVendor               `json:"vendors"`
@@ -152,10 +157,19 @@ func fetchOpenLuxJSON(ctx context.Context, path, token string, out any) error {
 }
 
 func fetchOpenLuxCatalog(ctx context.Context) (*openLuxCatalog, *openLuxAccount, string, error) {
-	var catalog openLuxCatalog
-	if err := fetchOpenLuxJSON(ctx, "/api/pricing_new", "", &catalog); err != nil {
+	var raw map[string]json.RawMessage
+	if err := fetchOpenLuxJSON(ctx, "/api/pricing_new", "", &raw); err != nil {
 		return nil, nil, "", err
 	}
+	encodedSource, err := common.Marshal(raw)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	var catalog openLuxCatalog
+	if err := common.Unmarshal(encodedSource, &catalog); err != nil {
+		return nil, nil, "", common.NewMessage("OpenLux response is invalid JSON")
+	}
+	catalog.Raw = raw
 	if !catalog.Success || len(catalog.Models) == 0 || len(catalog.Ratios) == 0 {
 		return nil, nil, "", common.NewMessage("OpenLux returned an empty or unsuccessful catalog")
 	}
@@ -179,7 +193,26 @@ func fetchOpenLuxCatalog(ctx context.Context) (*openLuxCatalog, *openLuxAccount,
 		// to fall back to another account's price or group access.
 		catalog.Groups, catalog.Ratios = account.Data.Groups, account.Data.Ratios
 	}
-	encoded, err := common.Marshal(catalog)
+	// Hash the pricing contract, not provider presentation or unordered sets.
+	// OpenLux changes endpoint array order between requests without changing prices.
+	pricing := catalog
+	pricing.Raw, pricing.Vendors = nil, nil
+	pricing.Groups = make(map[string]string, len(catalog.Groups))
+	for name := range catalog.Groups {
+		pricing.Groups[name] = ""
+	}
+	pricing.Models = slices.Clone(catalog.Models)
+	for i := range pricing.Models {
+		item := &pricing.Models[i]
+		item.Description, item.Icon, item.Tags = "", "", ""
+		item.VendorID, item.Translations = 0, nil
+		item.Groups = slices.Clone(item.Groups)
+		slices.Sort(item.Groups)
+		item.Endpoints = slices.Clone(item.Endpoints)
+		slices.Sort(item.Endpoints)
+	}
+	slices.SortFunc(pricing.Models, func(a, b openLuxModel) int { return strings.Compare(a.Name, b.Name) })
+	encoded, err := common.Marshal(pricing)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -192,31 +225,59 @@ func GetOpenLuxCatalog(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	data := gin.H{"version": version, "fetched_at": time.Now().Unix(), "groups": catalog.Groups, "ratios": catalog.Ratios, "model_count": len(catalog.Models), "account_rates": account != nil}
+	// The OpenLux web client uses 2 USD/1M tokens for model_ratio=1.
+	// Expose that source convention separately from administrator-confirmed import units.
+	support := make(map[string]string, len(catalog.Models))
+	for _, item := range catalog.Models {
+		support[item.Name] = ""
+		if _, err := openLuxPriceExpression(item, 2, 1, 1); err != nil {
+			support[item.Name] = err.Error()
+		}
+	}
+	localRatios := map[string]float64{}
+	for group, sale := range billing_setting.GetOpenLuxSales() {
+		if sale.NormalizedPrices && ratio_setting.ContainsGroupRatio(group) {
+			localRatios[group] = ratio_setting.GetGroupRatio(group)
+		}
+	}
+	topups := map[string]float64{}
+	if err := common.UnmarshalJsonStr(common.TopupGroupRatio2JSONString(), &topups); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	data := gin.H{"version": version, "fetched_at": time.Now().Unix(), "groups": catalog.Groups, "ratios": catalog.Ratios, "model_count": len(catalog.Models), "account_rates": account != nil,
+		"catalog": catalog.Raw, "price_unit": 2, "import_support": support, "sales": billing_setting.GetOpenLuxSales(), "local_group_ratios": localRatios, "topup_group_ratios": topups,
+	}
 	if account != nil {
 		data["group_ids"], data["uptime"] = account.Data.IDs, account.Data.Uptime
 	}
 	common.ApiSuccess(c, data)
 }
 
-// openLuxTokenExpression converts only contracts whose full price dimensions
-// this integration understands. Unsupported facts must never silently become a
-// cheaper ordinary token price. The last tier is the fallback, not a context cap.
-func openLuxTokenExpression(item openLuxModel, unit, groupRatio, markup float64) (string, error) {
-	if item.QuotaType == nil || *item.QuotaType != 0 || item.Ratio == nil || item.Completion == nil {
-		return "", common.NewMessage("Only explicit text token pricing is supported")
+// openLuxImageEndpoints maps verified Images API aliases onto local routes.
+// Mixed or unknown protocol families require separate billing verification.
+func openLuxImageEndpoints(endpoints []string) map[string]common.EndpointInfo {
+	if len(endpoints) == 0 {
+		return nil
 	}
-	if item.Audio != nil || item.AudioCompletion != nil || item.Image != nil || item.ImageCache != nil || item.VideoResolutionRatios != nil || item.PixverseRefAudio != nil || item.PixverseRefSilent != nil {
-		return "", common.NewMessage("Multimodal pricing needs a separate verified adapter")
-	}
-	for _, endpoint := range item.Endpoints {
-		if !slices.Contains([]string{"openai", "openai-response", "anthropic", "gemini"}, endpoint) {
-			return "", common.NewMessage("The model exposes an unsupported billing protocol")
+	result := map[string]common.EndpointInfo{}
+	for _, endpoint := range endpoints {
+		switch endpoint {
+		case "image-generation", "images-generations", "openai-绘图", "dall-e-3":
+			result["image-generation"] = common.EndpointInfo{Path: "/v1/images/generations", Method: "POST"}
+		case "OpenAI image edit", "image-edit", "images-edits", "openai-编辑":
+			result["image-edit"] = common.EndpointInfo{Path: "/v1/images/edits", Method: "POST"}
+		default:
+			return nil
 		}
 	}
-	if len(item.Endpoints) == 0 {
-		return "", common.NewMessage("No supported text endpoint is available")
-	}
+	return result
+}
+
+// openLuxPriceExpression freezes supported text/image contracts as USD prices.
+// Token image prices do not multiply by quantity; fixed image prices do.
+func openLuxPriceExpression(item openLuxModel, unit, groupRatio, markup float64) (string, error) {
+	imageEndpoints := openLuxImageEndpoints(item.Endpoints)
 	for _, value := range []float64{unit, markup} {
 		if math.IsNaN(value) || math.IsInf(value, 0) || value <= 0 {
 			return "", common.NewMessage("Price unit and markup must be finite positive numbers")
@@ -224,6 +285,40 @@ func openLuxTokenExpression(item openLuxModel, unit, groupRatio, markup float64)
 	}
 	if math.IsNaN(groupRatio) || math.IsInf(groupRatio, 0) || groupRatio < 0 {
 		return "", common.NewMessage("The upstream group rate is invalid")
+	}
+	if item.Audio != nil || item.AudioCompletion != nil || item.VideoResolutionRatios != nil || item.PixverseRefAudio != nil || item.PixverseRefSilent != nil {
+		return "", common.NewMessage("Multimodal pricing needs a separate verified adapter")
+	}
+	if item.QuotaType != nil && *item.QuotaType == 1 && imageEndpoints != nil {
+		if item.Price == nil || *item.Price < 0 || math.IsNaN(*item.Price) || math.IsInf(*item.Price, 0) || len(item.Steps) != 0 || item.Image != nil || item.ImageCache != nil || item.Cache != nil || item.CacheCreation != nil || item.Cache5m != nil || item.Cache1h != nil {
+			return "", common.NewMessage("The upstream image price is incomplete or unsupported")
+		}
+		price := *item.Price * groupRatio * markup
+		if math.IsNaN(price) || math.IsInf(price, 0) || (*item.Price > 0 && groupRatio > 0 && price == 0) {
+			return "", common.NewMessage("The upstream price is outside the supported range")
+		}
+		expression := "tier(\"image\", fixed(" + strconv.FormatFloat(price, 'g', -1, 64) + ")) * image_count"
+		if err := billing_setting.SmokeTestExpr(expression); err != nil {
+			return "", err
+		}
+		return expression, nil
+	}
+	if item.QuotaType == nil || *item.QuotaType != 0 || item.Ratio == nil || item.Completion == nil {
+		return "", common.NewMessage("Only explicit text or image pricing is supported")
+	}
+	if imageEndpoints == nil && (item.Image != nil || item.ImageCache != nil) {
+		return "", common.NewMessage("Multimodal pricing needs a separate verified adapter")
+	}
+	if item.ImageCache != nil && item.Image == nil {
+		return "", common.NewMessage("The upstream image price is incomplete or unsupported")
+	}
+	for _, endpoint := range item.Endpoints {
+		if imageEndpoints == nil && !slices.Contains([]string{"openai", "openai-response", "anthropic", "gemini"}, endpoint) {
+			return "", common.NewMessage("The model exposes an unsupported billing protocol")
+		}
+	}
+	if len(item.Endpoints) == 0 {
+		return "", common.NewMessage("No supported text endpoint is available")
 	}
 	if *item.Ratio < 0 || math.IsNaN(*item.Ratio) || math.IsInf(*item.Ratio, 0) {
 		return "", common.NewMessage("The upstream base rate is invalid")
@@ -269,6 +364,18 @@ func openLuxTokenExpression(item openLuxModel, unit, groupRatio, markup float64)
 			{"p", []float64{*step.Prompt}},
 			{"c", []float64{*item.Completion, *step.Completion}},
 			{"cr", []float64{cache, *step.Cache}},
+		}
+		if item.Image != nil {
+			factors = append(factors, struct {
+				name   string
+				values []float64
+			}{"img", []float64{*item.Image, *step.Prompt}})
+		}
+		if item.ImageCache != nil {
+			factors = append(factors, struct {
+				name   string
+				values []float64
+			}{"img_cr", []float64{*item.ImageCache, *step.Cache}})
 		}
 		if write != nil {
 			factors = append(factors, struct {
@@ -379,12 +486,12 @@ func openLuxPricing(ctx context.Context, channelID int, source openLuxSource) (m
 			continue
 		}
 		modelRatio := ratio
-		cost, err := openLuxTokenExpression(item, source.RatioUnit, modelRatio, 1)
+		cost, err := openLuxPriceExpression(item, source.RatioUnit, modelRatio, 1)
 		if err != nil {
 			quote.Excluded[item.Name] = err.Error()
 			continue
 		}
-		sale, err := openLuxTokenExpression(item, source.RatioUnit, modelRatio, source.Multiplier)
+		sale, err := openLuxPriceExpression(item, source.RatioUnit, modelRatio, source.Multiplier)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -446,6 +553,11 @@ func openLuxMetadata(ctx context.Context, locale string) (metadataSyncSource, ma
 	if err != nil {
 		return source, nil, nil, err
 	}
+	return openLuxMetadataFromCatalog(catalog, locale)
+}
+
+func openLuxMetadataFromCatalog(catalog *openLuxCatalog, locale string) (metadataSyncSource, map[string]model.MetadataValues, map[string]model.Vendor, error) {
+	source := metadataSyncSource{Locale: locale, ModelsURL: openLuxOrigin + "/api/pricing_new", VendorsURL: openLuxOrigin + "/api/pricing_new"}
 	models, vendors := map[string]model.MetadataValues{}, map[string]model.Vendor{}
 	byID := map[int]openLuxVendor{}
 	for _, vendor := range catalog.Vendors {
@@ -476,6 +588,13 @@ func openLuxMetadata(ctx context.Context, locale string) (metadataSyncSource, ma
 		// Upstream endpoint labels describe supported protocols, not local custom
 		// routing configuration. Do not copy unverified paths into model endpoints.
 		values := model.MetadataValues{Description: description, Icon: item.Icon, Tags: strings.Join(tags, ","), Vendor: byID[item.VendorID].Name, Status: 1}
+		if endpoints := openLuxImageEndpoints(item.Endpoints); endpoints != nil {
+			encoded, err := common.Marshal(endpoints)
+			if err != nil {
+				return source, nil, nil, err
+			}
+			values.Endpoints = string(encoded)
+		}
 		if err := model.ValidateMetadataValues(values); err != nil {
 			return source, nil, nil, common.NewMessage("OpenLux model {{model}}: invalid metadata", map[string]any{"model": item.Name})
 		}

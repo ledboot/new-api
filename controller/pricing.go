@@ -21,6 +21,20 @@ func filterPricingByUsableGroups(pricing []model.Pricing, usableGroup map[string
 
 	filtered := make([]model.Pricing, 0, len(pricing))
 	for _, item := range pricing {
+		if len(item.GroupBillingExpr) > 0 {
+			expressions := map[string]string{}
+			limits := map[string]int64{}
+			for group, expression := range item.GroupBillingExpr {
+				if _, ok := usableGroup[group]; ok {
+					expressions[group] = expression
+					if limit := item.GroupInputTokenLimits[group]; limit > 0 {
+						limits[group] = limit
+					}
+				}
+			}
+			item.GroupBillingExpr = expressions
+			item.GroupInputTokenLimits = limits
+		}
 		if common.StringsContains(item.EnableGroup, "all") {
 			filtered = append(filtered, item)
 			continue

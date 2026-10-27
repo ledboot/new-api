@@ -25,6 +25,7 @@ import {
 } from '@/features/model-pricing/currency'
 import {
   BILLING_PRICING_VARS,
+  parseTiersFromExpr,
   splitBillingExprAndRequestRules,
 } from '@/features/pricing/lib/billing-expr'
 import { tryParseVisualConfig } from '@/features/pricing/lib/tier-expr'
@@ -165,6 +166,25 @@ export function getSyncExpressionPricing(
 ) {
   const { billingExpr, requestRuleExpr } =
     splitBillingExprAndRequestRules(expression)
+  const parsed = parseTiersFromExpr(billingExpr)
+  if (
+    parsed.length > 0 &&
+    parsed.every((tier) => tier.billingUnit === 'request')
+  ) {
+    return {
+      requestRuleExpr,
+      tiers: parsed.map((tier) => ({
+        label: tier.label,
+        condition: tier.conditionText ?? '',
+        lines: [
+          {
+            label: t(tier.imageCount ? 'Price per image' : 'Price per request'),
+            value: formatSyncPriceAmount(tier.fixedPrice ?? 0, currency),
+          },
+        ],
+      })),
+    }
+  }
   const config = tryParseVisualConfig(billingExpr)
   if (!config) return null
   // Do not turn malformed or overflowing upstream numbers into free prices.

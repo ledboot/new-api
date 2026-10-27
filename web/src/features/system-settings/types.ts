@@ -510,11 +510,108 @@ export type OpenLuxQuote = {
   excluded: Record<string, string>
 }
 
+export type OpenLuxStep = {
+  step_size: number
+  completion_step_size?: number | null
+  prompt_step_ratio?: number | null
+  completion_step_ratio?: number | null
+  cache_step_ratio?: number | null
+  prompt_thinking_step_ratio?: number | null
+  completion_thinking_step_ratio?: number | null
+}
+
+export type OpenLuxModel = {
+  model_name: string
+  description?: string
+  tags?: string
+  vendor_id?: number
+  quota_type?: number | null
+  model_ratio?: number | null
+  model_price?: number | null
+  completion_ratio?: number | null
+  cache_ratio?: number | null
+  cache_creation_ratio?: number | null
+  cache_creation_5m_ratio?: number | null
+  cache_creation_1h_ratio?: number | null
+  image_ratio?: number | null
+  image_cache_ratio?: number | null
+  enable_groups?: string[]
+  supported_endpoint_types?: string[]
+  step_ratios?: OpenLuxStep[]
+  [field: string]: unknown
+}
+
 export type OpenLuxCatalog = {
   version: string
   fetched_at: number
   groups: Record<string, string>
   ratios: Record<string, number>
+  local_group_ratios?: Record<string, number>
+  topup_group_ratios?: Record<string, number>
   model_count: number
   account_rates: boolean
+  price_unit?: number
+  sales?: Record<
+    string,
+    {
+      channel_id: number
+      multiplier: number
+      source_version: string
+      models: Record<
+        string,
+        { cost: string; expression: string; input_token_limit?: number }
+      >
+    }
+  >
+  import_support?: Record<string, string>
+  group_ids?: Record<string, number>
+  uptime?: Record<string, { uptime?: number; status?: string }>
+  catalog?: {
+    data: OpenLuxModel[]
+    vendors?: {
+      id: number
+      name: string
+      description?: string
+      [field: string]: unknown
+    }[]
+    usable_group?: Record<string, string>
+    group_ratio?: Record<string, number>
+    group_model_ratio?: Record<string, Record<string, number>>
+    supported_endpoint?: Record<string, unknown>
+    [field: string]: unknown
+  }
+}
+
+export type OpenLuxSalesRequest = {
+  version: string
+  ratio_unit: number
+  groups: {
+    group: string
+    multiplier: number
+    api_key?: string
+    group_ratio?: number
+    topup_ratio?: number
+  }[]
+  key_group_confirmed: boolean
+  preview_version?: string
+}
+export type OpenLuxSalesPreview = {
+  preview_version: string
+  plan: {
+    local_version: string
+    groups: {
+      group: string
+      source_group_ratio?: number
+      group_ratio?: number
+      topup_ratio?: number
+      selling_prices?: Record<string, string>
+      multiplier: number
+      source_version: string
+      models: Record<
+        string,
+        { cost: string; expression: string; input_token_limit?: number }
+      >
+      excluded: Record<string, string>
+    }[]
+  }
 }

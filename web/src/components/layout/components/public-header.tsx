@@ -211,7 +211,7 @@ export function PublicHeader(props: PublicHeaderProps) {
         <div
           className={cn(
             'pointer-events-auto mx-auto transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
-            'max-w-6xl px-4 md:px-6'
+            'site-container px-4 md:px-6'
           )}
         >
           <nav

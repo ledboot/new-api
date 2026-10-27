@@ -2,21 +2,31 @@ package controller
 
 import (
 	"context"
+	"io"
+	"maps"
 	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
+	"github.com/QuantumNous/new-api/relay/channel/openai"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -167,7 +177,7 @@ func TestOpenLuxTokenPricesPreserveTierAndCacheCharges(t *testing.T) {
 			{Size: 1000000, CompletionSize: new(int64(-1)), Prompt: new(2.0), Completion: new(1.5), Cache: new(2.0)},
 		},
 	}
-	expression, err := openLuxTokenExpression(item, 2, 0.1, 1.2)
+	expression, err := openLuxPriceExpression(item, 2, 0.1, 1.2)
 	require.NoError(t, err)
 	for _, tc := range []struct {
 		name         string
@@ -185,11 +195,64 @@ func TestOpenLuxTokenPricesPreserveTierAndCacheCharges(t *testing.T) {
 		})
 	}
 	item.Cache, item.Cache5m, item.Cache1h = new(0.0), new(0.0), new(0.0)
-	expression, err = openLuxTokenExpression(item, 2, 0.1, 1.2)
+	expression, err = openLuxPriceExpression(item, 2, 0.1, 1.2)
 	require.NoError(t, err)
 	cost, _, err := billingexpr.RunExpr(expression, billingexpr.TokenParams{CR: 100, CC: 10, CC1h: 20, Len: 300000})
 	require.NoError(t, err)
 	assert.Zero(t, cost, "explicit zero cache prices remain free")
+}
+
+func TestOpenLuxImagePricesUseImageQuantityAndReportedTokenBreakdown(t *testing.T) {
+	fixed := openLuxModel{Name: "gpt-image-2-c", QuotaType: new(1), Price: new(0.12), Endpoints: []string{"openai-编辑", "openai-绘图"}}
+	expression, err := openLuxPriceExpression(fixed, 2, 0.1, 1.2)
+	require.NoError(t, err)
+	count := 3
+	cost, trace, err := billingexpr.RunExprWithRequest(expression, billingexpr.TokenParams{P: 10000, C: 20000}, billingexpr.RequestInput{ImageCount: &count})
+	require.NoError(t, err)
+	assert.InDelta(t, 43200, cost, 1e-8, "fixed image prices charge each image, independently of tokens")
+	assert.Equal(t, billingexpr.BillingUnitRequest, trace.BillingUnit)
+	// The token conversion base is irrelevant to per-image USD prices.
+	same, err := openLuxPriceExpression(fixed, 99, 0.1, 1.2)
+	require.NoError(t, err)
+	assert.Equal(t, expression, same)
+	fixed.Price = new(0.0)
+	free, err := openLuxPriceExpression(fixed, 2, 0.1, 1.2)
+	require.NoError(t, err)
+	cost, _, err = billingexpr.RunExprWithRequest(free, billingexpr.TokenParams{}, billingexpr.RequestInput{ImageCount: &count})
+	require.NoError(t, err)
+	assert.Zero(t, cost)
+	fixed.Price = nil
+	_, err = openLuxPriceExpression(fixed, 2, 0.1, 1.2)
+	require.Error(t, err, "a missing price never becomes free")
+	fixed.Price = new(-1.0)
+	_, err = openLuxPriceExpression(fixed, 2, 0, 1.2)
+	require.Error(t, err)
+
+	token := openLuxModel{Name: "gpt-image-2", QuotaType: new(0), Ratio: new(2.5), Completion: new(6.0), Image: new(1.6), ImageCache: new(0.64), Cache: new(0.4), Endpoints: []string{"image-generation", "OpenAI image edit"}}
+	expression, err = openLuxPriceExpression(token, 2, 0.1, 1.2)
+	require.NoError(t, err)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{ChannelType: 1}}
+	response := &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"data":[{"b64_json":"fixture"}],"usage":{"input_tokens":1000,"output_tokens":100,"input_tokens_details":{"text_tokens":400,"image_tokens":600,"cached_tokens":300,"cached_tokens_details":{"text_tokens":100,"image_tokens":200}}}}`))}
+	usage, apiErr := openai.OpenaiImageHandler(ctx, info, response)
+	require.Nil(t, apiErr)
+	params := service.BuildTieredTokenParams(usage, false, billingexpr.UsedVarsByHash(expression, billingexpr.ExprHashString(expression)))
+	assert.Equal(t, 300.0, params.P)
+	assert.Equal(t, 400.0, params.Img)
+	assert.Equal(t, 200.0, params.ImgCR)
+	assert.Equal(t, 100.0, params.C)
+	cost, _, err = billingexpr.RunExprWithRequest(expression, params, billingexpr.RequestInput{ImageCount: &count})
+	require.NoError(t, err)
+	assert.InDelta(t, 1024.8, cost, 1e-8, "text, images, and cache are priced once; image count does not multiply token usage")
+	token.Image = new(0.0)
+	token.ImageCache = new(0.0)
+	expression, err = openLuxPriceExpression(token, 2, 0.1, 1.2)
+	require.NoError(t, err)
+	assert.Contains(t, expression, "img * 0")
+	assert.Contains(t, expression, "img_cr * 0")
+	token.Image = new(-1.0)
+	_, err = openLuxPriceExpression(token, 2, 0, 1.2)
+	require.Error(t, err)
 }
 
 func TestOpenLuxRejectsIncompleteOrUnsupportedPrices(t *testing.T) {
@@ -221,7 +284,7 @@ func TestOpenLuxRejectsIncompleteOrUnsupportedPrices(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			item := openLuxModel{QuotaType: new(0), Ratio: new(5.0), Completion: new(5.0), Endpoints: []string{"openai"}}
 			tc.patch(&item)
-			_, err := openLuxTokenExpression(item, tc.unit, tc.group, tc.markup)
+			_, err := openLuxPriceExpression(item, tc.unit, tc.group, tc.markup)
 			require.Error(t, err)
 		})
 	}
@@ -553,4 +616,469 @@ func TestOpenLuxScheduledChangesIncludeRemovalsAndMetadata(t *testing.T) {
 	assert.Equal(t, openLuxSyncChanges{Added: 1, Removed: 1, Updated: 3, Names: []string{"fixed", "new", "old", "stable", "video"}}, changes[0])
 	assert.Equal(t, openLuxSyncChanges{Added: 1, Removed: 1, Names: []string{"new-group", "old-group"}}, changes[1])
 	assert.Equal(t, openLuxSyncChanges{Updated: 1, Names: []string{"Vendor"}}, changes[2])
+}
+
+func TestOpenLuxCatalogIncludesFullSourceAndAccountVisibility(t *testing.T) {
+	openLuxTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/user/self/groups" {
+			_, _ = w.Write([]byte(`{"success":true,"data":{"data":{"paid":"Account group"},"ratios":{"paid":0.05},"group_ids":{"paid":7},"uptime":{"paid":{"uptime":0.9827,"status":"healthy"}}}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"success":true,"data":[{"model_name":"gpt-fixture","quota_type":0,"model_ratio":5,"completion_ratio":5,"enable_groups":["paid","other"],"step_ratios":[{"step_size":272000,"prompt_step_ratio":1,"completion_step_ratio":1,"cache_step_ratio":1}],"supported_endpoint_types":["openai"],"cache_ratio":0,"extra_price":{"720p":0.4}}],"vendors":[{"id":52,"name":"Vendor","translations":{"zh":{"description":"厂商"}}}],"supported_endpoint":{"openai":{"path":"/v1/chat/completions"}},"auto_groups":["paid"],"usable_group":{"paid":"Public group","other":"Other"},"group_ratio":{"paid":0.1,"other":1},"group_model_ratio":{},"pixverse_v6max_promo":{"enabled":true}}`))
+	})
+	t.Setenv("OPENLUX_ACCOUNT_TOKEN", "fixture-secret")
+	var response struct {
+		Success bool `json:"success"`
+		Data    struct {
+			OpenLuxCatalog map[string]any     `json:"catalog"`
+			Groups         map[string]string  `json:"groups"`
+			Ratios         map[string]float64 `json:"ratios"`
+			Uptime         map[string]any     `json:"uptime"`
+			PriceUnit      float64            `json:"price_unit"`
+			ImportSupport  map[string]string  `json:"import_support"`
+		} `json:"data"`
+	}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/ratio_sync/openlux", nil)
+	GetOpenLuxCatalog(ctx)
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
+	require.True(t, response.Success)
+	require.NotEmpty(t, response.Data.OpenLuxCatalog)
+	assert.Equal(t, float64(2), response.Data.PriceUnit)
+	assert.Equal(t, map[string]string{"paid": "Account group"}, response.Data.Groups)
+	assert.Equal(t, 0.05, response.Data.Ratios["paid"])
+	assert.Contains(t, response.Data.Uptime, "paid")
+	assert.Empty(t, response.Data.ImportSupport["gpt-fixture"])
+	raw := response.Data.OpenLuxCatalog
+	assert.Contains(t, raw, "supported_endpoint")
+	assert.Contains(t, raw, "vendors")
+	assert.Contains(t, raw, "auto_groups")
+	assert.Contains(t, raw, "pixverse_v6max_promo")
+	models, ok := raw["data"].([]any)
+	require.True(t, ok)
+	require.Len(t, models, 1)
+	item := models[0].(map[string]any)
+	assert.Equal(t, float64(0), item["cache_ratio"])
+	assert.Equal(t, map[string]any{"720p": 0.4}, item["extra_price"])
+	assert.Contains(t, item, "step_ratios")
+	assert.NotContains(t, recorder.Body.String(), "fixture-secret")
+}
+
+func TestOpenLuxSalesPublishAndBillingDatabaseMatrix(t *testing.T) {
+	require.NoError(t, i18n.Init())
+	previousQuota, previousMultiplier := common.QuotaPerUnit, operation_setting.GetQuotaSetting().PreConsumeMultiplier
+	previousSpecial := ratio_setting.GroupGroupRatio2JSONString()
+	common.QuotaPerUnit = 500000
+	operation_setting.GetQuotaSetting().PreConsumeMultiplier = 1
+	require.NoError(t, ratio_setting.UpdateGroupGroupRatioByJSONString("{}"))
+	t.Cleanup(func() {
+		common.QuotaPerUnit = previousQuota
+		operation_setting.GetQuotaSetting().PreConsumeMultiplier = previousMultiplier
+		_ = ratio_setting.UpdateGroupGroupRatioByJSONString(previousSpecial)
+	})
+	for _, dialect := range []struct{ kind, env string }{{"sqlite", ""}, {"mysql", "TEST_MYSQL_DSN"}, {"postgres", "TEST_POSTGRES_DSN"}} {
+		t.Run(dialect.kind, func(t *testing.T) {
+			dsn := os.Getenv(dialect.env)
+			if dialect.env != "" && dsn == "" {
+				t.Skip("database DSN not configured")
+			}
+			db := modelManagementDB(t, dialect.kind, dsn)
+			logDB, _ := newAuditTestDatabase(t, dialect.kind, dsn)
+			require.NoError(t, logDB.AutoMigrate(&model.AuditLog{}))
+			model.LOG_DB = logDB
+			common.SetLogDatabaseType(common.MainDatabaseType())
+			operator := model.User{Username: "openlux-operator", Password: "fixture-hash", Role: common.RoleRootUser, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1}
+			require.NoError(t, db.Create(&operator).Error)
+
+			previewHandler := func(c *gin.Context) {
+				c.Request.Header.Set("Content-Type", "application/json")
+				c.Set("id", operator.Id)
+				PreviewOpenLuxSales(c)
+			}
+			publishHandler := func(c *gin.Context) {
+				c.Request.Header.Set("Content-Type", "application/json")
+				c.Set("id", operator.Id)
+				PublishOpenLuxSales(c)
+			}
+			t.Cleanup(func() {
+				if connection, err := model.DB.DB(); err == nil {
+					_ = connection.Close()
+				}
+			})
+			savedSales, _ := common.Marshal(billing_setting.GetOpenLuxSales())
+			savedRatios, savedUsable := ratio_setting.GroupRatio2JSONString(), setting.UserUsableGroups2JSONString()
+			savedTopups := common.TopupGroupRatio2JSONString()
+			savedSpecial := ratio_setting.GroupGroupRatio2JSONString()
+			require.NoError(t, billing_setting.LoadOpenLuxSales("{}"))
+			t.Cleanup(func() {
+				require.NoError(t, billing_setting.LoadOpenLuxSales(string(savedSales)))
+				require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(savedRatios))
+				require.NoError(t, setting.UpdateUserUsableGroupsByJSONString(savedUsable))
+				require.NoError(t, common.UpdateTopupGroupRatioByJSONString(savedTopups))
+				require.NoError(t, ratio_setting.UpdateGroupGroupRatioByJSONString(savedSpecial))
+			})
+			payload := `{"success":true,"data":[{"model_name":"catalog-text","quota_type":0,"model_ratio":5,"completion_ratio":5,"cache_ratio":0.1,"enable_groups":["sale-a","sale-b","rollback-a","rollback-z"],"supported_endpoint_types":["openai"]},{"model_name":"new-text","step_ratios":[{"step_size":100000,"prompt_step_ratio":1,"completion_step_ratio":1,"cache_step_ratio":1},{"step_size":1000000,"prompt_step_ratio":5,"completion_step_ratio":5,"cache_step_ratio":5}],"quota_type":0,"model_ratio":1,"completion_ratio":2,"vendor_id":52,"description":"Source text","enable_groups":["sale-a","sale-b","rollback-a","rollback-z"],"supported_endpoint_types":["openai"]},{"model_name":"video","quota_type":4,"enable_groups":["sale-a","sale-b"]}],"vendors":[{"id":52,"name":"Source vendor","icon":"OpenAI"}],"usable_group":{"sale-a":"A","sale-b":"B","rollback-a":"R1","rollback-z":"R2"},"group_ratio":{"sale-a":0.1,"sale-b":0.2,"rollback-a":0.1,"rollback-z":0.1}}`
+			payload = strings.Replace(payload, `],"vendors":`, `,{"model_name":"gpt-image-2-c","quota_type":1,"model_price":0.12,"enable_groups":["sale-a","sale-b"],"supported_endpoint_types":["openai-编辑","openai-绘图"]},{"model_name":"gpt-image-2","quota_type":0,"model_ratio":2.5,"completion_ratio":6,"image_ratio":1.6,"image_cache_ratio":0.64,"cache_ratio":0.4,"enable_groups":["sale-a","sale-b"],"supported_endpoint_types":["image-generation","OpenAI image edit"]}],"vendors":`, 1)
+			openLuxTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(payload))
+			})
+			require.NoError(t, db.Create(&model.Model{ModelName: "catalog-text", Description: "Administrator metadata", Status: 1}).Error)
+			_, _, version, err := fetchOpenLuxCatalog(context.Background())
+			require.NoError(t, err)
+			require.NoError(t, model.UpdateOption("TopupGroupRatio", `{"sale-b":0.8,"unrelated":0.7}`))
+			request := openLuxSalesRequest{Version: version, RatioUnit: 2, KeyGroupConfirmed: true, Groups: []openLuxSaleSelection{{Group: "sale-a", Multiplier: 1.2, APIKey: "fixture-a-secret"}, {Group: "sale-b", Multiplier: 1.2, APIKey: "fixture-b-secret"}}}
+			for _, tc := range []struct {
+				name   string
+				change func(*openLuxSalesRequest)
+			}{
+				{"missing confirmation", func(r *openLuxSalesRequest) { r.KeyGroupConfirmed = false }},
+				{"missing unit", func(r *openLuxSalesRequest) { r.RatioUnit = 0 }},
+				{"discount below cost", func(r *openLuxSalesRequest) { r.Groups[0].Multiplier = 0.9 }},
+				{"negative group multiplier", func(r *openLuxSalesRequest) { r.Groups[0].GroupRatio = new(-0.1) }},
+				{"negative top-up multiplier", func(r *openLuxSalesRequest) { r.Groups[0].TopupRatio = new(-0.1) }},
+				{"missing key", func(r *openLuxSalesRequest) { r.Groups[0].APIKey = "" }},
+				{"duplicate group", func(r *openLuxSalesRequest) { r.Groups[1].Group = r.Groups[0].Group }},
+				{"unavailable group", func(r *openLuxSalesRequest) { r.Groups[0].Group = "missing" }},
+				{"stale source", func(r *openLuxSalesRequest) { r.Version = "old-source" }},
+			} {
+				invalid := request
+				invalid.Groups = slices.Clone(request.Groups)
+				tc.change(&invalid)
+				var result struct{ Success bool }
+				response := modelManagementRequest(t, previewHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/preview", invalid, &result)
+				assert.False(t, result.Success, tc.name)
+				assert.NotContains(t, response.Body.String(), "fixture-a-secret")
+			}
+			var preview struct {
+				Success bool
+				Data    struct {
+					Plan           model.OpenLuxSalesPlan
+					PreviewVersion string `json:"preview_version"`
+				}
+			}
+			response := modelManagementRequest(t, previewHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/preview", request, &preview)
+			require.True(t, preview.Success, response.Body.String())
+			require.Len(t, preview.Data.Plan.Groups, 2)
+			assert.NotContains(t, response.Body.String(), "fixture-a-secret")
+			assert.Contains(t, preview.Data.Plan.Groups[0].Excluded, "video")
+			assert.Equal(t, 0.1, preview.Data.Plan.Groups[0].GroupRatio)
+			assert.Equal(t, 1.0, preview.Data.Plan.Groups[0].TopupRatio)
+			assert.Equal(t, 0.8, preview.Data.Plan.Groups[1].TopupRatio)
+			assert.Contains(t, preview.Data.Plan.Groups[1].SellingPrices["catalog-text"], "2.4")
+			var count int64
+			require.NoError(t, db.Model(&model.Channel{}).Count(&count).Error)
+			assert.Zero(t, count, "preview is read-only")
+			broken := preview.Data.Plan
+			broken.Groups = slices.Clone(broken.Groups)
+			broken.Groups[0].Models = maps.Clone(broken.Groups[0].Models)
+			invalid := broken.Groups[0].Models["new-text"]
+			invalid.Expression = "-1"
+			broken.Groups[0].Models["new-text"] = invalid
+			_, err = model.PublishOpenLuxSales(broken, map[string]string{"sale-a": "fixture-a-secret", "sale-b": "fixture-b-secret"}, map[string]model.MetadataValues{"new-text": {Status: 1}, "catalog-text": {Status: 1}}, nil)
+			require.Error(t, err)
+			require.NoError(t, db.Model(&model.Channel{}).Count(&count).Error)
+			assert.Zero(t, count, "invalid prices must roll back before commit")
+			request.PreviewVersion = preview.Data.PreviewVersion
+			var published struct {
+				Success bool
+				Data    struct {
+					Groups   int
+					Channels map[string]int
+				}
+			}
+			response = modelManagementRequest(t, publishHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/publish", request, &published)
+			require.True(t, published.Success, response.Body.String())
+			require.Len(t, published.Data.Channels, 2)
+			imported, _, managed := billing_setting.GetOpenLuxSalePrice("sale-a", "new-text")
+			require.True(t, managed)
+			assert.EqualValues(t, 1000000, imported.InputTokenLimit)
+			assert.EqualValues(t, 1000000, billing_setting.GetOpenLuxModelInputLimits("new-text")["sale-a"])
+			// Old saved prices omitted context metadata. Republish must fill it
+			// without replacing the owned channels or administrator metadata.
+			legacy := billing_setting.GetOpenLuxSales()
+			for group, sale := range legacy {
+				price := sale.Models["new-text"]
+				price.InputTokenLimit = 0
+				sale.Models["new-text"] = price
+				legacy[group] = sale
+			}
+			legacyRaw, err := common.Marshal(legacy)
+			require.NoError(t, err)
+			require.NoError(t, db.Model(&model.Option{}).Where(map[string]any{"key": billing_setting.OpenLuxSalesOption}).Update("value", string(legacyRaw)).Error)
+			require.NoError(t, billing_setting.LoadOpenLuxSales(string(legacyRaw)))
+			legacyPrice, _, _ := billing_setting.GetOpenLuxSalePrice("sale-a", "new-text")
+			assert.Zero(t, legacyPrice.InputTokenLimit)
+			var audit model.AuditLog
+			require.NoError(t, logDB.First(&audit).Error)
+			assert.Equal(t, operator.Id, audit.UserId)
+			assert.Equal(t, "model.pricing.update", audit.Action)
+			auditData, err := common.Marshal(audit.Other)
+			require.NoError(t, err)
+			assert.Contains(t, string(auditData), "sale-a")
+			assert.Contains(t, string(auditData), "catalog-text")
+			assert.NotContains(t, string(auditData), "fixture-a-secret")
+			assert.NotContains(t, string(auditData), "fixture-b-secret")
+
+			require.NoError(t, db.Model(&model.Ability{}).Count(&count).Error)
+			assert.EqualValues(t, 8, count)
+			var metadata model.Model
+			require.NoError(t, db.Where("model_name = ?", "catalog-text").First(&metadata).Error)
+			assert.Equal(t, "Administrator metadata", metadata.Description)
+			metadata = model.Model{}
+			require.NoError(t, db.Where("model_name = ?", "new-text").First(&metadata).Error)
+			assert.NotZero(t, metadata.VendorID)
+			assert.NotEqual(t, 52, metadata.VendorID)
+			assert.Equal(t, 0.1, ratio_setting.GetGroupRatio("sale-a"))
+			assert.Equal(t, 0.2, ratio_setting.GetGroupRatio("sale-b"))
+			assert.Equal(t, 1.0, common.GetTopupGroupRatio("sale-a"))
+			assert.Equal(t, 0.8, common.GetTopupGroupRatio("sale-b"))
+			assert.Equal(t, 0.7, common.GetTopupGroupRatio("unrelated"))
+			assert.Contains(t, setting.GetUserUsableGroupsCopy(), "sale-a")
+			public := model.GetPricing()
+			pricingIndex := slices.IndexFunc(public, func(item model.Pricing) bool { return item.ModelName == "catalog-text" })
+			require.NotEqual(t, -1, pricingIndex)
+			assert.Len(t, public[pricingIndex].GroupBillingExpr, 2)
+			assert.Contains(t, public[pricingIndex].GroupBillingExpr["sale-b"], "p * 12")
+			var snapshot *billingexpr.BillingSnapshot
+			for _, tc := range []struct {
+				group       string
+				pre, actual int
+			}{{"sale-a", 900, 2700}, {"sale-b", 1800, 5400}} {
+				ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+				ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{}`))
+				info := &relaycommon.RelayInfo{OriginModelName: "catalog-text", UsingGroup: tc.group, UserGroup: "default", ChannelMeta: &relaycommon.ChannelMeta{ChannelId: published.Data.Channels[tc.group]}, BillingRequestInput: &billingexpr.RequestInput{Body: []byte(`{}`)}}
+				price, err := helper.ModelPriceHelper(ctx, info, 1000, nil)
+				require.NoError(t, err)
+				assert.Equal(t, tc.pre*2/3, price.QuotaToPreConsume, "reservation uses input only")
+				settled, err := billingexpr.ComputeTieredQuotaWithRequest(info.TieredBillingSnapshot, billingexpr.TokenParams{P: 2000, C: 500, Len: 2000}, *info.BillingRequestInput)
+				require.NoError(t, err)
+				assert.Equal(t, tc.actual, settled.ActualQuotaAfterGroup)
+				if tc.group == "sale-a" {
+					snapshot = info.TieredBillingSnapshot
+				}
+				info.ChannelId++
+				_, err = helper.ModelPriceHelper(ctx, info, 1000, nil)
+				require.Error(t, err, "a different channel cannot reuse a managed group's price")
+				info.ChannelId--
+				info.OriginModelName = "catalog-text@thinking:on"
+				_, err = helper.ModelPriceHelper(ctx, info, 1000, nil)
+				require.NoError(t, err)
+				assert.Equal(t, "catalog-text", info.GetBillingModelName())
+				info.OriginModelName = "unknown-model"
+				_, err = helper.ModelPriceHelper(ctx, info, 1000, nil)
+				require.Error(t, err, "unpublished models cannot inherit a global fallback price")
+			}
+			for _, tc := range []struct {
+				model string
+				quota int
+			}{{"gpt-image-2-c", 21600}, {"gpt-image-2", 300}} {
+				ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+				ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+				info := &relaycommon.RelayInfo{OriginModelName: tc.model, UsingGroup: "sale-a", UserGroup: "default", Request: &dto.ImageRequest{Model: tc.model, N: new(uint(3))}, ChannelMeta: &relaycommon.ChannelMeta{ChannelId: published.Data.Channels["sale-a"]}, BillingRequestInput: &billingexpr.RequestInput{}}
+				price, err := helper.ModelPriceHelper(ctx, info, 1000, nil)
+				require.NoError(t, err)
+				assert.Equal(t, tc.quota, price.QuotaToPreConsume)
+				imageCount := 1
+				actual, err := billingexpr.ComputeTieredQuotaWithRequest(info.TieredBillingSnapshot, billingexpr.TokenParams{P: 1000, Len: 1000}, billingexpr.RequestInput{ImageCount: &imageCount})
+				require.NoError(t, err)
+				if tc.model == "gpt-image-2-c" {
+					assert.Equal(t, 7200, actual.ActualQuotaAfterGroup)
+				} else {
+					assert.Equal(t, 300, actual.ActualQuotaAfterGroup)
+				}
+				var savedImage model.Model
+				require.NoError(t, db.Where("model_name = ?", tc.model).First(&savedImage).Error)
+				assert.Contains(t, savedImage.Endpoints, "/v1/images/edits")
+				assert.Contains(t, savedImage.Endpoints, "/v1/images/generations")
+			}
+			// Simulate the earlier saved contract, which embedded source ratios and
+			// used a local ratio of 1. Absolute user-group overrides must rebase once.
+			legacy = billing_setting.GetOpenLuxSales()
+			old := legacy["sale-a"]
+			old.NormalizedPrices = false
+			sourceCatalog, _, _, err := fetchOpenLuxCatalog(context.Background())
+			require.NoError(t, err)
+			for _, candidate := range sourceCatalog.Models {
+				if price, exists := old.Models[candidate.Name]; exists {
+					price.Expression, err = openLuxPriceExpression(candidate, 2, 0.1, 1.2)
+					require.NoError(t, err)
+					old.Models[candidate.Name] = price
+				}
+			}
+			legacy["sale-a"] = old
+			legacyRaw, err = common.Marshal(legacy)
+			require.NoError(t, err)
+			require.NoError(t, db.Model(&model.Option{}).Where(map[string]any{"key": billing_setting.OpenLuxSalesOption}).Update("value", string(legacyRaw)).Error)
+			require.NoError(t, billing_setting.LoadOpenLuxSales(string(legacyRaw)))
+			require.NoError(t, model.UpdateOption("GroupRatio", `{"sale-a":1,"sale-b":0.2}`))
+			require.NoError(t, model.UpdateOption("GroupGroupRatio", `{"vip":{"sale-a":0.5,"sale-b":1.5}}`))
+			// Replays must conflict; an explicit fresh preview updates owned channels.
+			response = modelManagementRequest(t, publishHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/publish", request, nil)
+			assert.Equal(t, http.StatusConflict, response.Code)
+			payload = strings.ReplaceAll(payload, `"step_size":1000000`, `"step_size":2000000`)
+			_, _, version, err = fetchOpenLuxCatalog(context.Background())
+			require.NoError(t, err)
+			request.Version = version
+			request.Groups[0].Multiplier = 1.5
+			request.Groups[0].GroupRatio = new(0.15)
+			request.Groups[0].TopupRatio = new(0.0)
+			request.Groups[1].GroupRatio = new(0.4)
+			request.Groups[0].APIKey = ""
+			request.Groups[1].APIKey = ""
+			response = modelManagementRequest(t, previewHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/preview", request, &preview)
+			require.True(t, preview.Success, response.Body.String())
+			request.PreviewVersion = preview.Data.PreviewVersion
+			var updated struct {
+				Success bool
+				Data    struct{ Channels map[string]int }
+			}
+			response = modelManagementRequest(t, publishHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/publish", request, &updated)
+			require.True(t, updated.Success, response.Body.String())
+			assert.Equal(t, published.Data.Channels, updated.Data.Channels)
+			assert.Equal(t, 0.15, ratio_setting.GetGroupRatio("sale-a"))
+			assert.Equal(t, 0.4, ratio_setting.GetGroupRatio("sale-b"))
+			assert.Zero(t, common.GetTopupGroupRatio("sale-a"))
+			assert.Equal(t, 0.8, common.GetTopupGroupRatio("sale-b"))
+			special, exists := ratio_setting.GetGroupGroupRatio("vip", "sale-a")
+			require.True(t, exists)
+			assert.InDelta(t, 0.05, special, 1e-12)
+			special, exists = ratio_setting.GetGroupGroupRatio("vip", "sale-b")
+			require.True(t, exists)
+			assert.Equal(t, 1.5, special, "already normalized overrides are not rescaled")
+			for _, tc := range []struct {
+				group, user string
+				quota       int
+			}{{"sale-a", "default", 5063}, {"sale-b", "default", 10800}, {"sale-a", "vip", 1688}} {
+				ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+				ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+				info := &relaycommon.RelayInfo{OriginModelName: "catalog-text", UsingGroup: tc.group, UserGroup: tc.user, ChannelMeta: &relaycommon.ChannelMeta{ChannelId: published.Data.Channels[tc.group]}, BillingRequestInput: &billingexpr.RequestInput{}}
+				_, err := helper.ModelPriceHelper(ctx, info, 1000, nil)
+				require.NoError(t, err)
+				actual, err := billingexpr.ComputeTieredQuotaWithRequest(info.TieredBillingSnapshot, billingexpr.TokenParams{P: 2000, C: 500, Len: 2000}, billingexpr.RequestInput{})
+				require.NoError(t, err)
+				assert.Equal(t, tc.quota, actual.ActualQuotaAfterGroup)
+			}
+			// Omitted values preserve the current project settings after normalization.
+			request.Groups[0].GroupRatio, request.Groups[0].TopupRatio, request.Groups[1].GroupRatio = nil, nil, nil
+			response = modelManagementRequest(t, previewHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/preview", request, &preview)
+			require.True(t, preview.Success, response.Body.String())
+			assert.Equal(t, 0.15, preview.Data.Plan.Groups[0].GroupRatio)
+			assert.Zero(t, preview.Data.Plan.Groups[0].TopupRatio)
+			request.PreviewVersion = preview.Data.PreviewVersion
+			response = modelManagementRequest(t, publishHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/publish", request, &updated)
+			require.True(t, updated.Success, response.Body.String())
+			special, _ = ratio_setting.GetGroupGroupRatio("vip", "sale-a")
+			assert.InDelta(t, 0.05, special, 1e-12, "republishing never rebases twice")
+			updatedPrice, _, _ := billing_setting.GetOpenLuxSalePrice("sale-a", "new-text")
+			assert.EqualValues(t, 2000000, updatedPrice.InputTokenLimit)
+			foundLimit := false
+			for _, pricing := range model.GetPricing() {
+				if pricing.ModelName == "new-text" {
+					foundLimit = true
+					assert.EqualValues(t, 2000000, pricing.GroupInputTokenLimits["sale-a"])
+					visible := filterPricingByUsableGroups([]model.Pricing{pricing}, map[string]string{"sale-a": "A"})
+					require.Len(t, visible, 1)
+					assert.Equal(t, map[string]int64{"sale-a": 2000000}, visible[0].GroupInputTokenLimits)
+				}
+			}
+			require.True(t, foundLimit, "published model must expose its source context limit")
+			settled, err := billingexpr.ComputeTieredQuotaWithRequest(snapshot, billingexpr.TokenParams{P: 2000, C: 500, Len: 2000}, billingexpr.RequestInput{})
+			require.NoError(t, err)
+			assert.Equal(t, 2700, settled.ActualQuotaAfterGroup, "in-flight settlement uses the frozen price")
+			var channel model.Channel
+			require.NoError(t, db.First(&channel, published.Data.Channels["sale-a"]).Error)
+			assert.Equal(t, "fixture-a-secret", channel.Key)
+			require.NoError(t, model.UpdateOption("GroupRatio", `{"sale-a":0.15,"sale-b":0.4,"rollback-z":1}`))
+			rollback := openLuxSalesRequest{Version: version, RatioUnit: 2, KeyGroupConfirmed: true, Groups: []openLuxSaleSelection{{Group: "rollback-a", Multiplier: 1.2, APIKey: "fixture-secret"}, {Group: "rollback-z", Multiplier: 1.2, APIKey: "fixture-secret"}}}
+			response = modelManagementRequest(t, previewHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/preview", rollback, &preview)
+			assert.False(t, preview.Success, response.Body.String())
+			assert.Contains(t, response.Body.String(), "already uses")
+			require.NoError(t, db.Model(&model.Channel{}).Count(&count).Error)
+			assert.EqualValues(t, 2, count, "failed batches roll back earlier groups")
+			assert.NotContains(t, billing_setting.GetOpenLuxSales(), "rollback-a")
+			// Existing schemas require no migration. Restart twice and retain prices,
+			// channel identities, credentials, and unrelated administrator metadata.
+			for range 2 {
+				connection, err := model.DB.DB()
+				require.NoError(t, err)
+				require.NoError(t, connection.Close())
+				require.NoError(t, model.InitDB())
+				model.InitOptionMap()
+				price, id, managed := billing_setting.GetOpenLuxSalePrice("sale-a", "catalog-text")
+				require.True(t, managed)
+				assert.Equal(t, published.Data.Channels["sale-a"], id)
+				assert.Contains(t, price.Expression, "p * 15")
+				assert.Equal(t, 0.15, ratio_setting.GetGroupRatio("sale-a"))
+				assert.Zero(t, common.GetTopupGroupRatio("sale-a"))
+				assert.Equal(t, 0.8, common.GetTopupGroupRatio("sale-b"))
+				persisted, _, _ := billing_setting.GetOpenLuxSalePrice("sale-a", "new-text")
+				assert.EqualValues(t, 2000000, persisted.InputTokenLimit)
+			}
+
+			validSnapshot, err := common.Marshal(billing_setting.GetOpenLuxSales())
+			require.NoError(t, err)
+			config.UpdateConfigFromMap(config.GlobalConfig.Get("billing_setting"), map[string]string{"billing_mode": `{"global-model":"tiered_expr"}`, "billing_expr": `{"global-model":"tier(\"base\", p * 1 + c * 1)"}`})
+			require.Error(t, billing_setting.LoadOpenLuxSales("{invalid"))
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+			info := &relaycommon.RelayInfo{OriginModelName: "global-model", UsingGroup: "default", UserGroup: "default", BillingRequestInput: &billingexpr.RequestInput{}}
+			_, err = helper.ModelPriceHelper(ctx, info, 1000, nil)
+			require.Error(t, err, "corrupt managed pricing cannot silently fall back to global prices")
+			require.NoError(t, billing_setting.LoadOpenLuxSales(string(validSnapshot)))
+			_, err = helper.ModelPriceHelper(ctx, info, 1000, nil)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestOpenLuxSalesRejectsCrossSiteAndNonJSONRequests(t *testing.T) {
+	for _, tc := range []struct{ contentType, site string }{{"text/plain", "same-origin"}, {"application/json", "cross-site"}} {
+		response := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(response)
+		ctx.Request = httptest.NewRequest(http.MethodPost, "/api/ratio_sync/openlux/sales/publish", strings.NewReader(`{"groups":[]}`))
+		ctx.Request.Header.Set("Content-Type", tc.contentType)
+		ctx.Request.Header.Set("Sec-Fetch-Site", tc.site)
+		PublishOpenLuxSales(ctx)
+		assert.Equal(t, http.StatusForbidden, response.Code)
+	}
+}
+
+func TestOpenLuxCatalogVersionTracksPricesInsteadOfPresentation(t *testing.T) {
+	catalog := openLuxCatalog{Success: true, Models: []openLuxModel{
+		{Name: "text", Ratio: new(5.0), Groups: []string{"a", "b"}, Endpoints: []string{"openai", "anthropic"}},
+		{Name: "other", Ratio: new(1.0)},
+	}, Groups: map[string]string{"a": "A", "b": "B"}, Ratios: map[string]float64{"a": 0.1, "b": 0.2}}
+	openLuxTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		encoded, err := common.Marshal(catalog)
+		require.NoError(t, err)
+		_, _ = w.Write(encoded)
+	})
+	_, _, original, err := fetchOpenLuxCatalog(context.Background())
+	require.NoError(t, err)
+	catalog.Models[0].Endpoints = []string{"anthropic", "openai"}
+	catalog.Models[0].Groups = []string{"b", "a"}
+	catalog.Models[0].Description = "Updated model description"
+	catalog.Groups["a"] = "Updated group label"
+	catalog.Vendors = []openLuxVendor{{ID: 1, Name: "Updated vendor"}}
+	slices.Reverse(catalog.Models)
+	_, _, reordered, err := fetchOpenLuxCatalog(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, original, reordered, "Presentation and set ordering must not invalidate a reviewed price")
+	catalog.Models[1].Ratio = new(6.0)
+	_, _, repriced, err := fetchOpenLuxCatalog(context.Background())
+	require.NoError(t, err)
+	assert.NotEqual(t, original, repriced, "Actual model price changes must require a fresh preview")
+	catalog.Models[1].Ratio = new(5.0)
+	catalog.Ratios["a"] = 0.3
+	_, _, regrouped, err := fetchOpenLuxCatalog(context.Background())
+	require.NoError(t, err)
+	assert.NotEqual(t, original, regrouped, "Actual group rate changes must require a fresh preview")
+	catalog.Ratios["a"] = 0.1
+	catalog.Models[1].Endpoints = []string{"openai"}
+	_, _, rerouted, err := fetchOpenLuxCatalog(context.Background())
+	require.NoError(t, err)
+	assert.NotEqual(t, original, rerouted, "Protocol availability changes must invalidate the reviewed contract")
 }

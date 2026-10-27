@@ -17,11 +17,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, cleanup, within } from '@testing-library/react'
+import {
+  act,
+  render,
+  screen,
+  cleanup,
+  within,
+  waitFor,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
 import { afterEach, expect, it, vi } from 'vitest'
 
+import zhLocale from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 import {
   DEFAULT_CURRENCY_CONFIG,
@@ -189,7 +197,7 @@ const imageModel: PricingModel = {
 }
 
 it.each([false, true])(
-  'shows localized image labels and units in base and group pricing when configured=%s',
+  'shows localized image labels and units in group pricing when configured=%s',
   async (configured) => {
     vi.spyOn(api, 'get').mockResolvedValue({ data: { data: { groups: [] } } })
     const client = new QueryClient({
@@ -214,11 +222,11 @@ it.each([false, true])(
       </QueryClientProvider>
     )
     await act(() => i18next.changeLanguage('zhCN'))
-    expect(screen.getAllByText('图片生成单价')).toHaveLength(2)
-    expect(screen.getAllByText(configured ? '/ 张' : '张')).toHaveLength(2)
+    expect(screen.getAllByText('图片生成单价')).toHaveLength(1)
+    expect(screen.getAllByText(configured ? '/ 张' : '张')).toHaveLength(1)
     expect(screen.queryByText('image_count')).not.toBeInTheDocument()
     if (configured) {
-      expect(screen.getByText('$0.2')).toBeVisible()
+      expect(screen.queryByText('$0.2')).not.toBeInTheDocument()
       expect(screen.getByText('$0.4')).toBeVisible()
     }
   }
@@ -306,7 +314,7 @@ it('refreshes memoized provider prices when the group or display currency change
   }
 })
 
-it('shows one standard task price and a localized group price without duplicate tiers', async () => {
+it('shows only localized group pricing without a duplicate base price', async () => {
   vi.spyOn(api, 'get').mockResolvedValue({ data: { data: { groups: [] } } })
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -328,18 +336,18 @@ it('shows one standard task price and a localized group price without duplicate 
   )
   expect(
     screen.getAllByText('Song generation unit price', { exact: false })
-  ).toHaveLength(2)
+  ).toHaveLength(1)
   expect(screen.queryByText('Tiered price table')).not.toBeInTheDocument()
   expect(screen.queryByText('Dynamic Pricing')).not.toBeInTheDocument()
   expect(screen.queryByText('music')).not.toBeInTheDocument()
-  expect(screen.getByText('$0.22')).toBeVisible()
+  expect(screen.queryByText('$0.22')).not.toBeInTheDocument()
   expect(screen.getByText('$0.44')).toBeVisible()
   await act(() => i18next.changeLanguage('zhCN'))
-  expect(screen.getAllByText('生成歌曲单价', { exact: false })).toHaveLength(2)
+  expect(screen.getAllByText('生成歌曲单价', { exact: false })).toHaveLength(1)
   await act(() => i18next.changeLanguage('fr'))
   expect(
     screen.getAllByText('Song generation unit price', { exact: false })
-  ).toHaveLength(2)
+  ).toHaveLength(1)
 })
 
 it('labels even a single task price on model cards', async () => {
@@ -663,4 +671,350 @@ it('shows provider count, price range and missing-price status in both list and 
   )
   expect(screen.getByText('0.4 – 0.8/s')).toBeVisible()
   expect(screen.getByText('$0.4 – $0.8')).toBeVisible()
+})
+
+it('hides detail performance metrics and the performance tab when the model has no observations', async () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { groups: [], summary: null } },
+  })
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  clients.push(client)
+  render(
+    <QueryClientProvider client={client}>
+      <ModelDetailsContent
+        model={model}
+        groupRatio={{}}
+        usableGroup={{}}
+        endpointMap={{}}
+        autoGroups={[]}
+        priceRate={1}
+        usdExchangeRate={1}
+        tokenUnit='M'
+      />
+    </QueryClientProvider>
+  )
+  await waitFor(() => expect(client.isFetching()).toBe(0))
+  expect(screen.queryByText('TPS')).not.toBeInTheDocument()
+  expect(screen.queryByText('Average latency')).not.toBeInTheDocument()
+  expect(screen.queryByText('Success rate')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('tab', { name: 'Performance' })
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('tab', { name: 'Overview' })
+  ).not.toBeInTheDocument()
+  expect(screen.queryByRole('tab', { name: 'API' })).not.toBeInTheDocument()
+})
+
+it('shows observed detail metrics and preserves a measured zero success rate', async () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        summary: { avg_tps: 24, avg_latency_ms: 2500, success_rate: 0 },
+        groups: [
+          {
+            group: 'default',
+            avg_tps: 24,
+            avg_latency_ms: 2500,
+            avg_ttft_ms: 100,
+            success_rate: 0,
+            series: [],
+          },
+        ],
+        series: [],
+      },
+    },
+  })
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  clients.push(client)
+  render(
+    <QueryClientProvider client={client}>
+      <ModelDetailsContent
+        model={model}
+        groupRatio={{}}
+        usableGroup={{}}
+        endpointMap={{}}
+        autoGroups={[]}
+        priceRate={1}
+        usdExchangeRate={1}
+        tokenUnit='M'
+      />
+    </QueryClientProvider>
+  )
+  expect(
+    screen.queryByRole('tab', { name: 'Performance' })
+  ).not.toBeInTheDocument()
+  expect(await screen.findByText('TPS')).toBeVisible()
+  expect(screen.getByText('Average latency')).toBeVisible()
+  expect(screen.getByText('Success rate')).toBeVisible()
+  expect(await screen.findByText('0.00%')).toBeVisible()
+})
+
+it('shows OpenLux input token intervals instead of generated tier identifiers', () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { groups: [], summary: null } },
+  })
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  clients.push(client)
+  render(
+    <QueryClientProvider client={client}>
+      <ModelDetailsContent
+        model={{
+          ...model,
+          billing_mode: 'tiered_expr',
+          billing_usage_schema: undefined,
+          billing_expr:
+            'len <= 100000 ? tier("openlux_1", p * 1 + c * 5) : len <= 1000000 ? tier("openlux_2", p * 5 + c * 25) : tier("openlux_3", p * 10 + c * 50)',
+        }}
+        groupRatio={{ default: 1 }}
+        usableGroup={{ default: { desc: '', ratio: 1 } }}
+        endpointMap={{}}
+        autoGroups={[]}
+        priceRate={1}
+        usdExchangeRate={1}
+        tokenUnit='M'
+      />
+    </QueryClientProvider>
+  )
+  expect(screen.getAllByText('Input token count').length).toBeGreaterThan(0)
+  expect(zhLocale.translation['Input token count']).toBe('输入Token数')
+  expect(screen.getAllByText('[0, 100000]').length).toBeGreaterThan(0)
+  expect(screen.getAllByText('(100000, 1000000]').length).toBeGreaterThan(0)
+  expect(screen.getAllByText('(1000000, ∞)').length).toBeGreaterThan(0)
+  expect(screen.queryByText('openlux_1')).not.toBeInTheDocument()
+  expect(screen.queryByText('openlux_2')).not.toBeInTheDocument()
+  expect(screen.queryByText('openlux_3')).not.toBeInTheDocument()
+})
+
+it('uses the unlimited translation for an OpenLux tier without token bounds', () => {
+  render(
+    <DynamicPricingBreakdown billingExpr='tier("openlux_1", p * 1 + c * 5)' />
+  )
+  expect(screen.getAllByText('No range limit').length).toBeGreaterThan(0)
+  expect(zhLocale.translation['No range limit']).toBe('不限')
+  expect(screen.queryByText('[0, ∞)')).not.toBeInTheDocument()
+})
+
+it('keeps the published OpenLux upper input limit separate for each group', () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { groups: [], summary: null } },
+  })
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  clients.push(client)
+  const expression =
+    'len <= 100000 ? tier("openlux_1", p * 1 + c * 5) : tier("openlux_2", p * 5 + c * 25)'
+  render(
+    <QueryClientProvider client={client}>
+      <ModelDetailsContent
+        model={{
+          ...model,
+          billing_mode: undefined,
+          billing_expr: undefined,
+          billing_usage_schema: undefined,
+          enable_groups: ['default', 'premium', 'legacy'],
+          group_billing_expr: { default: expression, premium: expression },
+          group_input_token_limits: { default: 1000000, premium: 2000000 },
+        }}
+        groupRatio={{ default: 1, premium: 1, legacy: 1 }}
+        usableGroup={{
+          default: { desc: '', ratio: 1 },
+          premium: { desc: '', ratio: 1 },
+          legacy: { desc: '', ratio: 1 },
+        }}
+        endpointMap={{}}
+        autoGroups={[]}
+        priceRate={1}
+        usdExchangeRate={1}
+        tokenUnit='M'
+      />
+    </QueryClientProvider>
+  )
+  const pricing = screen
+    .getByRole('heading', { name: 'Pricing by Group' })
+    .closest('section') as HTMLElement
+  expect(within(pricing).getAllByRole('table')).toHaveLength(1)
+  expect(
+    within(pricing).getByRole('columnheader', { name: 'Pricing group name' })
+  ).toBeVisible()
+  expect(within(pricing).getByText('legacy')).toBeVisible()
+  const defaultName = within(pricing).getByText('default')
+  expect(defaultName.closest('td')).toHaveAttribute('rowspan', '2')
+  expect(within(pricing).queryByText('1x')).not.toBeInTheDocument()
+  const groupTitle = within(pricing).getByRole('heading', {
+    name: 'Pricing by Group',
+  })
+  expect(pricing).not.toHaveClass('bg-card/60', 'p-4')
+  expect(groupTitle.parentElement).toHaveTextContent(
+    '(Prices shown per 1M tokens)'
+  )
+
+  expect(screen.getByText('(100000, 1000000]')).toBeVisible()
+  expect(screen.getByText('(100000, 2000000]')).toBeVisible()
+  expect(screen.queryByText('(100000, ∞)')).not.toBeInTheDocument()
+})
+
+it('sorts model detail groups by numeric input price after group multipliers, including free pricing', () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { groups: [], summary: null } },
+  })
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  clients.push(client)
+  render(
+    <QueryClientProvider client={client}>
+      <ModelDetailsContent
+        model={{
+          ...model,
+          billing_mode: undefined,
+          billing_expr: undefined,
+          billing_usage_schema: undefined,
+          enable_groups: ['expensive', 'cheap', 'discount', 'free'],
+          group_billing_expr: {
+            expensive: 'tier("openlux_1", p * 9 + c * 10)',
+            cheap: 'tier("openlux_1", p * 2 + c * 100)',
+            discount: 'tier("openlux_1", p * 9 + c * 20)',
+            free: 'tier("openlux_1", p * 5 + c * 30)',
+          },
+        }}
+        groupRatio={{ expensive: 1, cheap: 1, discount: 0.1, free: 0 }}
+        usableGroup={{
+          expensive: { desc: '', ratio: 1 },
+          cheap: { desc: '', ratio: 1 },
+          discount: { desc: '', ratio: 0.1 },
+          free: { desc: '', ratio: 0 },
+        }}
+        endpointMap={{}}
+        autoGroups={[]}
+        priceRate={1}
+        usdExchangeRate={1}
+        tokenUnit='M'
+      />
+    </QueryClientProvider>
+  )
+  const section = screen
+    .getByRole('heading', { name: 'Pricing by Group' })
+    .closest('section') as HTMLElement
+  expect(
+    within(section)
+      .getAllByText(/^(expensive|cheap|discount|free)$/)
+      .map((element) => element.textContent)
+  ).toEqual(['free', 'discount', 'cheap', 'expensive'])
+})
+
+it('sorts legacy token pricing groups by their effective input prices', () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { groups: [], summary: null } },
+  })
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  clients.push(client)
+  render(
+    <QueryClientProvider client={client}>
+      <ModelDetailsContent
+        model={{
+          ...model,
+          billing_mode: undefined,
+          billing_expr: undefined,
+          billing_usage_schema: undefined,
+          enable_groups: ['high', 'low', 'free'],
+        }}
+        groupRatio={{ high: 3, low: 1, free: 0 }}
+        usableGroup={{
+          high: { desc: '', ratio: 3 },
+          low: { desc: '', ratio: 1 },
+          free: { desc: '', ratio: 0 },
+        }}
+        endpointMap={{}}
+        autoGroups={[]}
+        priceRate={1}
+        usdExchangeRate={1}
+        tokenUnit='M'
+      />
+    </QueryClientProvider>
+  )
+  const section = screen
+    .getByRole('heading', { name: 'Pricing by Group' })
+    .closest('section') as HTMLElement
+  expect(
+    within(section)
+      .getAllByText(/^(high|low|free)$/)
+      .map((element) => element.textContent)
+  ).toEqual(['free', 'low', 'high'])
+})
+
+it('renders only group pricing and inline API endpoint rows without overview tabs or base prices', async () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { groups: [], summary: null } },
+  })
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  clients.push(client)
+  render(
+    <QueryClientProvider client={client}>
+      <ModelDetailsContent
+        model={{
+          ...model,
+          billing_usage_schema: undefined,
+          billing_expr: 'tier("openlux_1", p * 1 + c * 5)',
+          supported_endpoint_types: ['openai', 'unknown'],
+        }}
+        groupRatio={{ default: 1 }}
+        usableGroup={{ default: { desc: '', ratio: 1 } }}
+        endpointMap={{
+          anthropic: { method: 'POST', path: '/v1/messages' },
+          openai: { method: 'POST', path: '/v1/chat/completions' },
+        }}
+        autoGroups={[]}
+        priceRate={1}
+        usdExchangeRate={1}
+        tokenUnit='M'
+      />
+    </QueryClientProvider>
+  )
+  expect(
+    screen.queryByRole('tab', { name: 'Overview' })
+  ).not.toBeInTheDocument()
+  expect(screen.queryByRole('tab', { name: 'API' })).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('heading', { name: 'Base price' })
+  ).not.toBeInTheDocument()
+  expect(
+    screen.getByRole('heading', { name: 'Pricing by Group' })
+  ).toBeVisible()
+  const endpointTitle = screen.getByRole('heading', { name: 'API Endpoints' })
+  const modelTitle = screen.getByRole('heading', { name: /^Model$/ })
+  expect(endpointTitle).toHaveClass('text-xs')
+  expect(modelTitle).toHaveClass('text-xs')
+  const headings = screen.getAllByRole('heading')
+  expect(headings.indexOf(modelTitle)).toBeLessThan(
+    headings.indexOf(endpointTitle)
+  )
+  expect(headings.indexOf(endpointTitle)).toBeLessThan(
+    headings.indexOf(screen.getByRole('heading', { name: 'Pricing by Group' }))
+  )
+  expect(
+    screen.getAllByRole('button', { name: 'Copy endpoint path' })
+  ).toHaveLength(2)
+  expect(screen.queryByText('unknown')).not.toBeInTheDocument()
+  const row = screen.getByText('/v1/messages').closest('li') as HTMLElement
+  expect(within(row).getByText('POST')).toBeVisible()
+  expect(within(row).getByText('Anthropic')).toBeVisible()
+  expect(screen.getByText('OpenAI')).toBeVisible()
+  expect(screen.getByText('/v1/chat/completions')).toBeVisible()
+  await userEvent
+    .setup()
+    .click(within(row).getByRole('button', { name: 'Copy endpoint path' }))
+  expect(await navigator.clipboard.readText()).toBe('/v1/messages')
 })

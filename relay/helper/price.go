@@ -63,6 +63,8 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) hostty
 }
 
 func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens int, meta *types.TokenCountMeta) (hosttypes.PriceData, error) {
+	billing_setting.OpenLuxSalesConfigMu.RLock()
+	defer billing_setting.OpenLuxSalesConfigMu.RUnlock()
 	if info != nil {
 		if matched := resolveBillingModelName(info.GetOriginModelName()); matched != "" && matched != info.OriginModelName {
 			info.BillingModelName = matched
@@ -72,6 +74,20 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 	modelPrice, usePrice := ratio_setting.GetModelPrice(billingModelName, false)
 
 	groupRatioInfo := HandleGroupRatio(c, info)
+	if price, channelID, managed := billing_setting.GetOpenLuxSalePrice(info.UsingGroup, info.OriginModelName); managed {
+		groupModel := info.OriginModelName
+		if price.Expression == "" {
+			groupModel = ratio_setting.RoutingMatchModelName(info.OriginModelName)
+			price, channelID, _ = billing_setting.GetOpenLuxSalePrice(info.UsingGroup, groupModel)
+		}
+		if price.Expression == "" || channelID != info.GetChannelID() {
+			return hosttypes.PriceData{}, modelPriceNotConfiguredError(c, info.OriginModelName, info.UserId)
+		}
+		// Resolve the price from the server-selected group on every attempt, then
+		// freeze it through the existing pre-consume and settlement snapshot.
+		info.BillingModelName = groupModel
+		return modelPriceHelperTiered(c, info, groupModel, promptTokens, groupRatioInfo)
+	}
 
 	// Check if this model uses tiered_expr billing
 	if billing_setting.GetBillingMode(billingModelName) == billing_setting.BillingModeTieredExpr {
@@ -343,6 +359,9 @@ func resolveBillingModelName(origin string) string {
 
 func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, billingModelName string, promptTokens int, groupRatioInfo hosttypes.GroupRatioInfo) (hosttypes.PriceData, error) {
 	exprStr, ok := billing_setting.GetBillingExpr(billingModelName)
+	if price, _, managed := billing_setting.GetOpenLuxSalePrice(info.UsingGroup, billingModelName); managed {
+		exprStr, ok = price.Expression, price.Expression != ""
+	}
 	if !ok {
 		return hosttypes.PriceData{}, fmt.Errorf("model %s is configured as tiered_expr but has no billing expression", billingModelName)
 	}

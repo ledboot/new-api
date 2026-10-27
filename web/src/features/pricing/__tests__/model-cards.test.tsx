@@ -17,14 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createJSONStorage } from 'zustand/middleware'
@@ -140,6 +133,27 @@ describe('model cards', () => {
     expect(screen.getByText('$1.5')).toBeVisible()
   })
 
+  it('places input, output and cache read prices on separate horizontal rows', () => {
+    render(
+      <ModelCard
+        model={pricingModel({
+          billing_mode: 'tiered_expr',
+          billing_expr: 'tier("base", p * 1 + c * 5 + cr * 0.1)',
+        })}
+        onClick={vi.fn()}
+      />
+    )
+    const pricing = screen.getByRole('group', { name: 'Pricing' })
+    const rows = ['Input', 'Output', 'Cache Read'].map(
+      (label) => within(pricing).getByText(label).parentElement
+    )
+    for (const row of rows) {
+      expect(row).toHaveClass('items-baseline', 'justify-between')
+    }
+    expect(rows[0]?.parentElement).toHaveClass('flex-col')
+    expect(new Set(rows).size).toBe(3)
+  })
+
   it('copies the complete long model name without opening details', async () => {
     const user = userEvent.setup()
     const onClick = vi.fn()
@@ -151,111 +165,30 @@ describe('model cards', () => {
     await user.click(screen.getByRole('button', { name: 'Copy model name' }))
     expect(await navigator.clipboard.readText()).toBe(name)
     expect(onClick).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: 'Details' }))
+    await user.click(screen.getByRole('button', { name }))
     expect(onClick).toHaveBeenCalledOnce()
     expect(onClick).toHaveBeenCalledWith(name)
   })
 
-  it('shows missing values without placeholder bars when metrics are unavailable', () => {
-    render(<ModelCard model={pricingModel()} onClick={vi.fn()} />)
-    const metrics = screen.getByLabelText(
-      'Performance metrics for the last 24 hours'
-    )
-    expect(within(metrics).getAllByText('—')).toHaveLength(2)
-    expect(within(metrics).getByText('—s')).toBeVisible()
-    expect(within(metrics).getByText('—t/s')).toBeVisible()
-    expect(within(metrics).queryByText(/100/)).not.toBeInTheDocument()
-    const statusStrip = within(metrics).getByRole('img', {
-      name: 'No performance data available',
-    })
-    expect(statusStrip).toHaveTextContent('—')
-    expect(statusStrip.querySelectorAll('[aria-hidden]')).toHaveLength(0)
-    expect(screen.getByText('No description available.')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Details' })).toBeEnabled()
-  })
-
-  it('uses fixed spacing between available status samples', () => {
-    render(
-      <ModelCard
-        model={pricingModel()}
-        onClick={vi.fn()}
-        perf={{
-          avg_latency_ms: 1200,
-          avg_tps: 42,
-          success_rate: 50,
-          recent_success_series: [
-            { ts: 3600, success_rate: 100 },
-            { ts: 18000, success_rate: 0 },
-          ],
-        }}
-      />
-    )
-    const statusStrip = screen.getByRole('img', {
-      name: 'Success rate',
-    })
-    expect(statusStrip).toHaveClass('gap-px')
-    expect(statusStrip).not.toHaveClass('justify-between')
-  })
-
-  it('shows server history for idle models while preserving the current window metrics', async () => {
-    const request = vi.spyOn(api, 'get').mockResolvedValue({
-      data: {
-        success: true,
-        data: {
-          models: [
-            {
-              model_name: 'active-model',
-              avg_latency_ms: 1200,
-              avg_tps: 42,
-              success_rate: 99.8,
-              recent_success_series: [{ ts: 7200, success_rate: 0 }],
-            },
-          ],
-          recent_success_series: {
-            'active-model': [{ ts: 3600, success_rate: 100 }],
-            'idle-model': [
-              { ts: 3600, success_rate: 0 },
-              { ts: 7200, success_rate: 100 },
-            ],
-          },
-        },
-      },
-    })
-    render(
-      <QueryClientProvider client={queryClient}>
-        <ModelCardGrid
-          models={[
-            pricingModel({ model_name: 'active-model' }),
-            pricingModel({ id: 2, model_name: 'idle-model' }),
-          ]}
-          onModelClick={vi.fn()}
-        />
-      </QueryClientProvider>
-    )
-    await screen.findByText('99.80%')
-    expect(request).toHaveBeenCalledWith('/api/perf-metrics/summary', {
-      params: { hours: 24, recent_model: ['active-model', 'idle-model'] },
-      paramsSerializer: { indexes: null },
-    })
-    const [active, idle] = screen.getAllByLabelText(
-      'Performance metrics for the last 24 hours'
-    )
-    expect(within(active).getByText('1.20s')).toBeVisible()
+  it('opens model details from the whole card with mouse or keyboard and removes the status footer', async () => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    render(<ModelCard model={pricingModel()} onClick={onClick} />)
     expect(
-      within(active).getByRole('img', { name: 'Success rate' }).children[0]
-    ).toHaveClass('bg-emerald-500')
-    const samples = within(idle).getByRole('img', {
-      name: 'Success rate',
-    }).children
-    expect(samples).toHaveLength(2)
-    expect(samples[0]).toHaveClass('bg-red-500')
-    expect(samples[1]).toHaveClass('bg-emerald-500')
-    expect(within(idle).getByText('—')).toBeVisible()
-    expect(within(idle).getByText('—s')).toBeVisible()
-    expect(within(idle).getByText('—t/s')).toBeVisible()
+      screen.queryByLabelText('Performance metrics for the last 24 hours')
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('Details')).not.toBeInTheDocument()
+    const card = screen.getByRole('button', { name: 'example-model' })
+    expect(card).toHaveClass('absolute', 'inset-0', 'cursor-pointer')
+    await user.click(card)
+    expect(onClick).toHaveBeenLastCalledWith('example-model')
+    card.focus()
+    await user.keyboard('{Enter}')
+    await user.keyboard(' ')
+    expect(onClick).toHaveBeenCalledTimes(3)
   })
 
-  it('keeps group, endpoint and tag overflow counts with their own metadata', () => {
+  it('hides group and endpoint metadata while retaining tag overflow counts', () => {
     const groups = ['default-with-a-long-group-name', 'premium', 'internal']
     const endpoints = ['openai-response', 'openai', 'claude', 'gemini', 'jina']
     const tags = [
@@ -277,21 +210,9 @@ describe('model cards', () => {
       />
     )
 
-    const groupField = screen.getByText('Groups').parentElement
-    const endpointField = screen.getByText('Endpoints').parentElement
-    if (!groupField || !endpointField) {
-      throw new Error('Expected labeled group and endpoint fields')
-    }
+    expect(screen.queryByText('Groups')).not.toBeInTheDocument()
+    expect(screen.queryByText('Endpoints')).not.toBeInTheDocument()
     const tagField = screen.getByRole('group', { name: 'Tags' })
-    expect(within(groupField).getByText(groups[0])).toBeVisible()
-    expect(within(groupField).getByText('+2')).toHaveAttribute(
-      'title',
-      groups.slice(1).join(', ')
-    )
-    expect(
-      within(endpointField).getByText('openai-response, openai')
-    ).toHaveAttribute('title', endpoints.join(', '))
-    expect(within(endpointField).getByText('+3')).toBeVisible()
     expect(
       within(tagField).getByText('video-generation, high-resolution')
     ).toHaveAttribute('title', tags.join(', '))
@@ -316,30 +237,6 @@ describe('model cards', () => {
       screen.queryByRole('group', { name: 'Tags' })
     ).not.toBeInTheDocument()
   })
-
-  it.each([
-    { success_rate: 0, expected: '0.00%' },
-    { success_rate: 99.8, expected: '99.80%' },
-    { success_rate: Number.NaN, expected: '—' },
-  ])(
-    'shows $expected for the reported request success rate $success_rate',
-    ({ success_rate, expected }) => {
-      render(
-        <ModelCard
-          model={pricingModel()}
-          onClick={vi.fn()}
-          perf={{ avg_latency_ms: 1200, avg_tps: 42, success_rate }}
-        />
-      )
-      const metrics = screen.getByLabelText(
-        'Performance metrics for the last 24 hours'
-      )
-      expect(within(metrics).getAllByText(expected)[0]).toBeVisible()
-      expect(within(metrics).getByText('Status')).toBeVisible()
-      expect(within(metrics).getByText('1.20s')).toBeVisible()
-      expect(within(metrics).getByText('42.0t/s')).toBeVisible()
-    }
-  )
 
   it('keeps group and recharge pricing correct when changing the token unit, including a free cache price', () => {
     const props = {
@@ -594,43 +491,20 @@ describe('model cards', () => {
     expect(screen.getByText(expression)).toBeVisible()
   })
 
-  it('keeps browsing and missing metric values available after the metrics request fails', async () => {
-    const request = vi
-      .spyOn(api, 'get')
-      .mockRejectedValue(new Error('metrics unavailable'))
+  it('does not request removed card performance metrics and keeps the details action available', async () => {
+    const request = vi.spyOn(api, 'get')
     const onModelClick = vi.fn()
     render(
-      <QueryClientProvider client={queryClient}>
-        <ModelCardGrid models={[pricingModel()]} onModelClick={onModelClick} />
-      </QueryClientProvider>
+      <ModelCardGrid models={[pricingModel()]} onModelClick={onModelClick} />
     )
-    await waitFor(() =>
-      expect(
-        queryClient.getQueryState([
-          'perf-metrics-summary',
-          24,
-          ['example-model'],
-        ])?.status
-      ).toBe('error')
-    )
-    expect(request).toHaveBeenCalledWith('/api/perf-metrics/summary', {
-      params: { hours: 24, recent_model: ['example-model'] },
-      paramsSerializer: { indexes: null },
-    })
-    expect(
-      within(
-        screen.getByLabelText('Performance metrics for the last 24 hours')
-      ).getAllByText(/^—/)
-    ).toHaveLength(4)
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Details' }))
+    expect(request).not.toHaveBeenCalled()
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'example-model' }))
     expect(onModelClick).toHaveBeenCalledWith('example-model')
   })
 
   it('paginates the model cards and disables navigation at both boundaries', async () => {
-    const request = vi.spyOn(api, 'get').mockResolvedValue({
-      data: { success: true, data: { models: [] } },
-    })
     const models = Array.from({ length: 21 }, (_, index) =>
       pricingModel({ id: index + 1, model_name: `model-${index + 1}` })
     )
@@ -642,20 +516,9 @@ describe('model cards', () => {
     )
     expect(screen.getByRole('button', { name: 'Previous page' })).toBeDisabled()
     expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(20)
-    expect(request).toHaveBeenCalledWith('/api/perf-metrics/summary', {
-      params: {
-        hours: 24,
-        recent_model: models.slice(0, 20).map((model) => model.model_name),
-      },
-      paramsSerializer: { indexes: null },
-    })
     await user.click(screen.getByRole('button', { name: 'Next page' }))
     expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(1)
     expect(screen.getByRole('heading', { name: 'model-21' })).toBeVisible()
-    expect(request).toHaveBeenLastCalledWith('/api/perf-metrics/summary', {
-      params: { hours: 24, recent_model: ['model-21'] },
-      paramsSerializer: { indexes: null },
-    })
     expect(screen.getByRole('button', { name: 'Next page' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Previous page' }))
     expect(screen.getByRole('heading', { name: 'model-1' })).toBeVisible()
@@ -674,170 +537,13 @@ describe('model cards', () => {
     const grid = screen
       .getByRole('heading', { name: 'example-model' })
       .closest('.grid')
-    expect(grid).toHaveClass('xl:grid-cols-3')
+    expect(grid).toHaveClass(
+      'grid-cols-1',
+      'md:grid-cols-2',
+      'xl:grid-cols-3',
+      '2xl:grid-cols-4'
+    )
     expect(grid).not.toHaveClass('2xl:grid-cols-3')
     expect(grid).not.toHaveClass('min-[1440px]:grid-cols-3')
-  })
-
-  it('shows only sparse valid samples in chronological order without placeholder bars', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-09-07T12:00:00.000Z'))
-    const currentHourStart = Math.floor(Date.now() / 1000 / 3600) * 3600
-
-    render(
-      <ModelCard
-        model={pricingModel()}
-        onClick={vi.fn()}
-        perf={{
-          avg_latency_ms: 1200,
-          avg_tps: 42,
-          success_rate: 100,
-          window_start: currentHourStart - 23 * 3600,
-          recent_success_series: [
-            { ts: currentHourStart, success_rate: 100 },
-            { ts: currentHourStart - 5 * 3600, success_rate: 80 },
-            { ts: currentHourStart - 3 * 3600, success_rate: 0 },
-          ],
-        }}
-      />
-    )
-
-    const spans = [
-      ...screen.getByRole('img', {
-        name: 'Success rate',
-      }).children,
-    ]
-    expect(spans).toHaveLength(3)
-    expect(spans[0]).toHaveClass('bg-amber-500')
-    expect(spans[1]).toHaveClass('bg-red-500')
-    expect(spans[2]).toHaveClass('bg-emerald-500')
-    vi.useRealTimers()
-  })
-
-  it('skips invalid samples without inserting gaps or dropping a zero success rate', () => {
-    const windowStart = Date.parse('2026-09-07T00:00:00.000Z') / 1000
-    render(
-      <ModelCard
-        model={pricingModel()}
-        onClick={vi.fn()}
-        perf={{
-          avg_latency_ms: 1200,
-          avg_tps: 42,
-          success_rate: 50,
-          window_start: windowStart,
-          recent_success_series: [
-            { ts: windowStart, success_rate: 100 },
-            { ts: windowStart + 3600, success_rate: Number.NaN },
-            { ts: windowStart + 2 * 3600, success_rate: -1 },
-            { ts: windowStart + 3 * 3600, success_rate: 101 },
-            {
-              ts: windowStart + 4 * 3600,
-              success_rate: Number.POSITIVE_INFINITY,
-            },
-            { ts: windowStart + 5 * 3600, success_rate: 0 },
-            { ts: Number.NaN, success_rate: 100 },
-          ],
-        }}
-      />
-    )
-
-    const spans = [
-      ...screen.getByRole('img', {
-        name: 'Success rate',
-      }).children,
-    ]
-    expect(spans).toHaveLength(2)
-    expect(spans[0]).toHaveClass('bg-emerald-500')
-    expect(spans[1]).toHaveClass('bg-red-500')
-  })
-
-  it('shows the latest 24 valid samples without requiring hourly window metadata or mutating the series', () => {
-    const recentSeries = [
-      { ts: 0, success_rate: 0 },
-      ...Array.from({ length: 24 }, (_, index) => ({
-        ts: (index + 1) * 7200,
-        success_rate: 100,
-      })),
-      { ts: 25 * 7200, success_rate: Number.NaN },
-    ].reverse()
-    const originalSeries = [...recentSeries]
-    render(
-      <ModelCard
-        model={pricingModel()}
-        onClick={vi.fn()}
-        perf={{
-          avg_latency_ms: 1200,
-          avg_tps: 42,
-          success_rate: 100,
-          recent_success_series: recentSeries,
-        }}
-      />
-    )
-
-    const spans = [
-      ...screen.getByRole('img', {
-        name: 'Success rate',
-      }).children,
-    ]
-    expect(spans).toHaveLength(24)
-    spans.forEach((sample) => {
-      expect(sample).toHaveClass('bg-emerald-500')
-    })
-    expect(recentSeries).toEqual(originalSeries)
-  })
-
-  it.each([undefined, [], [{ ts: 3600, success_rate: Number.NaN }]])(
-    'shows an empty state without bars when the series has no valid samples: %j',
-    (series) => {
-      render(
-        <ModelCard
-          model={pricingModel()}
-          onClick={vi.fn()}
-          perf={{
-            avg_latency_ms: 1200,
-            avg_tps: 42,
-            success_rate: 100,
-            recent_success_series: series,
-          }}
-        />
-      )
-
-      const statusStrip = screen.getByRole('img', {
-        name: 'No performance data available',
-      })
-      expect(statusStrip).toHaveTextContent('—')
-      expect(statusStrip.querySelectorAll('[aria-hidden]')).toHaveLength(0)
-    }
-  )
-
-  it('shows a single server sample without padding when the browser clock is a day ahead', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-09-07T12:37:00.000Z'))
-    const currentHourStart = Math.floor(Date.now() / 1000 / 3600) * 3600
-
-    render(
-      <ModelCard
-        model={pricingModel()}
-        onClick={vi.fn()}
-        perf={{
-          avg_latency_ms: 1200,
-          avg_tps: 42,
-          success_rate: 80,
-          window_start: currentHourStart - 47 * 3600,
-          recent_success_series: [
-            { ts: currentHourStart - 29 * 3600, success_rate: 80 },
-          ],
-        }}
-      />
-    )
-
-    const spans = [
-      ...screen.getByRole('img', {
-        name: 'Success rate',
-      }).children,
-    ]
-    expect(spans).toHaveLength(1)
-    expect(spans[0]).toHaveClass('bg-amber-500')
-    vi.useRealTimers()
   })
 })

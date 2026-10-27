@@ -36,7 +36,7 @@ export function CTA(props: CTAProps) {
   }
 
   return (
-    <section className='bg-primary text-primary-foreground relative z-10 mx-5 my-16 overflow-hidden rounded-xl px-6 py-14 md:mx-auto md:max-w-6xl md:py-16'>
+    <section className='bg-primary text-primary-foreground relative z-10 mx-5 my-16 overflow-hidden rounded-xl px-6 py-14 md:mx-6 xl:mx-8 md:py-16'>
       <AnimateInView
         className='mx-auto max-w-2xl text-center'
         animation='scale-in'

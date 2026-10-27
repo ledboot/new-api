@@ -259,6 +259,8 @@ func SetApiRouter(router *gin.Engine) {
 			ratioSyncRoute.GET("/channels", controller.GetSyncableChannels)
 			ratioSyncRoute.GET("/openlux", controller.GetOpenLuxCatalog)
 			ratioSyncRoute.POST("/openlux/publish", controller.PublishOpenLuxPricing)
+			ratioSyncRoute.POST("/openlux/sales/preview", middleware.SessionCookieOriginGuard(), controller.PreviewOpenLuxSales)
+			ratioSyncRoute.POST("/openlux/sales/publish", middleware.SessionCookieOriginGuard(), controller.PublishOpenLuxSales)
 			ratioSyncRoute.POST("/fetch", controller.FetchUpstreamRatios)
 		}
 		taskPluginRoute := apiRouter.Group("/plugin/task")

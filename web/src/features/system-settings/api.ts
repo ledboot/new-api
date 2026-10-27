@@ -145,3 +145,24 @@ export async function publishOpenLuxPricing(request: {
   const res = await api.post('/api/ratio_sync/openlux/publish', request)
   return res.data
 }
+
+export async function previewOpenLuxSales(
+  request: import('./types').OpenLuxSalesRequest
+) {
+  const res = await api.post<{
+    success: boolean
+    message?: string
+    data: import('./types').OpenLuxSalesPreview
+  }>('/api/ratio_sync/openlux/sales/preview', request)
+  return res.data
+}
+export async function publishOpenLuxSales(
+  request: import('./types').OpenLuxSalesRequest
+) {
+  const res = await api.post<{
+    success: boolean
+    message?: string
+    data: { groups: number; channels: Record<string, number> }
+  }>('/api/ratio_sync/openlux/sales/publish', request)
+  return res.data
+}

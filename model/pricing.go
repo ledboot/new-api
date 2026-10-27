@@ -25,6 +25,8 @@ type PricingPluginVariant struct {
 }
 
 type Pricing struct {
+	GroupInputTokenLimits  map[string]int64                     `json:"group_input_token_limits,omitempty"`
+	GroupBillingExpr       map[string]string                    `json:"group_billing_expr,omitempty"`
 	BillingPluginVariants  []PricingPluginVariant               `json:"billing_plugin_variants,omitempty"`
 	ModelName              string                               `json:"model_name"`
 	Description            string                               `json:"description,omitempty"`
@@ -328,6 +330,8 @@ func updatePricing() {
 	for model, groups := range modelGroupsMap {
 		pricing := Pricing{
 			ModelName:              model,
+			GroupBillingExpr:       billing_setting.GetOpenLuxModelPrices(model),
+			GroupInputTokenLimits:  billing_setting.GetOpenLuxModelInputLimits(model),
 			EnableGroup:            groups.Items(),
 			SupportedEndpointTypes: modelSupportEndpointTypes[model],
 		}

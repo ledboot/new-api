@@ -178,7 +178,7 @@ export function Features(_props: FeaturesProps) {
 
   return (
     <section className='tokara-features relative z-10 px-6 py-16 md:py-20'>
-      <div className='mx-auto max-w-6xl'>
+      <div className='mx-auto site-container'>
         <AnimateInView className='mb-9 max-w-lg'>
           <p className='text-primary mb-3 text-xs font-medium tracking-widest uppercase'>
             {t('Core Features')}
