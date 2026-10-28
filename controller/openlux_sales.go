@@ -94,6 +94,10 @@ func buildOpenLuxSalesPlan(ctx context.Context, request openLuxSalesRequest) (mo
 				return plan, nil, nil, common.NewMessage("Group and top-up multipliers must be finite and non-negative")
 			}
 		}
+		groupRatio, err = billing_setting.RoundOpenLuxGroupRatio(groupRatio)
+		if err != nil {
+			return plan, nil, nil, err
+		}
 		item := model.OpenLuxSalePlanGroup{Group: group, Multiplier: selection.Multiplier, SourceGroupRatio: ratio, GroupRatio: groupRatio, TopupRatio: topupRatio, SourceVersion: version, Models: map[string]billing_setting.OpenLuxSalePrice{}, SellingPrices: map[string]string{}, Excluded: map[string]string{}}
 		for _, candidate := range catalog.Models {
 			if !slices.Contains(candidate.Groups, group) {
@@ -111,7 +115,7 @@ func buildOpenLuxSalesPlan(ctx context.Context, request openLuxSalesRequest) (mo
 			if err != nil {
 				return plan, nil, nil, err
 			}
-			selling, err := openLuxPriceExpression(candidate, request.RatioUnit, groupRatio, selection.Multiplier)
+			rounded, err := billing_setting.OpenLuxPriceExpressions(expression, groupRatio)
 			if err != nil {
 				return plan, nil, nil, err
 			}
@@ -123,7 +127,7 @@ func buildOpenLuxSalesPlan(ctx context.Context, request openLuxSalesRequest) (mo
 				item.Excluded[candidate.Name] = "The upstream pricing tier is incomplete"
 				continue
 			}
-			item.SellingPrices[candidate.Name] = selling
+			item.SellingPrices[candidate.Name] = rounded.SellingExpression
 			item.Models[candidate.Name] = billing_setting.OpenLuxSalePrice{Cost: cost, Expression: expression, InputTokenLimit: inputLimit}
 		}
 		if len(item.Models) == 0 {
@@ -163,6 +167,43 @@ func decodeOpenLuxSalesRequest(c *gin.Context) (openLuxSalesRequest, bool) {
 		return request, false
 	}
 	return request, true
+}
+
+// GetPublishedOpenLuxSales reads the locally published contract, without
+// contacting OpenLux or returning channel credentials.
+func GetPublishedOpenLuxSales(c *gin.Context) {
+	billing_setting.OpenLuxSalesConfigMu.RLock()
+	defer billing_setting.OpenLuxSalesConfigMu.RUnlock()
+	sales := billing_setting.GetOpenLuxSales()
+	ratios := make(map[string]float64, len(sales))
+	effective := make(map[string]map[string]string, len(sales))
+	configuredRatios := ratio_setting.GetGroupRatioCopy()
+	for group, sale := range sales {
+		for name := range sale.Models {
+			_, channelID, managed := billing_setting.GetOpenLuxSalePrice(group, name)
+			if !managed || channelID != sale.ChannelID {
+				common.ApiError(c, common.NewMessage("Published OpenLux prices are unavailable"))
+				return
+			}
+			break
+		}
+		ratios[group] = 1
+		if ratio, exists := configuredRatios[group]; exists {
+			ratios[group] = ratio
+		}
+		effective[group] = make(map[string]string, len(sale.Models))
+		for name, price := range sale.Models {
+			rounded, err := billing_setting.OpenLuxPriceExpressions(price.Expression, ratios[group])
+			if err != nil {
+				common.ApiError(c, common.NewMessage("Published OpenLux prices are unavailable"))
+				return
+			}
+			ratios[group] = rounded.GroupRatio
+			effective[group][name] = rounded.SellingExpression
+		}
+	}
+	c.Header("Cache-Control", "no-store")
+	common.ApiSuccess(c, gin.H{"sales": sales, "group_ratios": ratios, "effective_prices": effective})
 }
 
 func PreviewOpenLuxSales(c *gin.Context) {

@@ -555,6 +555,7 @@ export type OpenLuxCatalog = {
     string,
     {
       channel_id: number
+      normalized_prices?: boolean
       multiplier: number
       source_version: string
       models: Record<
@@ -614,4 +615,10 @@ export type OpenLuxSalesPreview = {
       excluded: Record<string, string>
     }[]
   }
+}
+
+export type PublishedOpenLuxPrices = {
+  sales: NonNullable<OpenLuxCatalog['sales']>
+  group_ratios: Record<string, number>
+  effective_prices: Record<string, Record<string, string>>
 }

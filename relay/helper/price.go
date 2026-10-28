@@ -360,7 +360,15 @@ func resolveBillingModelName(origin string) string {
 func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, billingModelName string, promptTokens int, groupRatioInfo hosttypes.GroupRatioInfo) (hosttypes.PriceData, error) {
 	exprStr, ok := billing_setting.GetBillingExpr(billingModelName)
 	if price, _, managed := billing_setting.GetOpenLuxSalePrice(info.UsingGroup, billingModelName); managed {
-		exprStr, ok = price.Expression, price.Expression != ""
+		rounded, err := billing_setting.OpenLuxPriceExpressions(price.Expression, groupRatioInfo.GroupRatio)
+		if err != nil {
+			return hosttypes.PriceData{}, err
+		}
+		exprStr, ok = rounded.Expression, rounded.Expression != ""
+		groupRatioInfo.GroupRatio = rounded.GroupRatio
+		if groupRatioInfo.HasSpecialRatio {
+			groupRatioInfo.GroupSpecialRatio = rounded.GroupRatio
+		}
 	}
 	if !ok {
 		return hosttypes.PriceData{}, fmt.Errorf("model %s is configured as tiered_expr but has no billing expression", billingModelName)

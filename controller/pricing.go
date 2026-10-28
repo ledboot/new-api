@@ -6,6 +6,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/gin-gonic/gin"
@@ -50,6 +51,8 @@ func filterPricingByUsableGroups(pricing []model.Pricing, usableGroup map[string
 }
 
 func GetPricing(c *gin.Context) {
+	billing_setting.OpenLuxSalesConfigMu.RLock()
+	defer billing_setting.OpenLuxSalesConfigMu.RUnlock()
 	pricing := model.GetPricing()
 	userId, exists := c.Get("id")
 	usableGroup := map[string]string{}
@@ -75,6 +78,24 @@ func GetPricing(c *gin.Context) {
 	for group := range ratio_setting.GetGroupRatioCopy() {
 		if _, ok := usableGroup[group]; !ok {
 			delete(groupRatio, group)
+		}
+	}
+
+	// Project the same rounded unit prices used by relay snapshots, including
+	// user-specific absolute group multipliers, without mutating the price cache.
+	for i := range pricing {
+		for g, expression := range pricing[i].GroupBillingExpr {
+			ratio, exists := groupRatio[g]
+			if !exists {
+				ratio = 1
+			}
+			rounded, err := billing_setting.OpenLuxPriceExpressions(expression, ratio)
+			if err != nil {
+				common.ApiError(c, common.NewMessage("Published OpenLux prices are unavailable"))
+				return
+			}
+			pricing[i].GroupBillingExpr[g] = rounded.Expression
+			groupRatio[g] = rounded.GroupRatio
 		}
 	}
 

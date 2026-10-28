@@ -166,3 +166,12 @@ export async function publishOpenLuxSales(
   }>('/api/ratio_sync/openlux/sales/publish', request)
   return res.data
 }
+
+export async function getPublishedOpenLuxPrices() {
+  const response = await api.get<{
+    success: boolean
+    message?: string
+    data: import('./types').PublishedOpenLuxPrices
+  }>('/api/ratio_sync/openlux/sales')
+  return response.data
+}

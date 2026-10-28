@@ -831,6 +831,20 @@ func TestOpenLuxSalesPublishAndBillingDatabaseMatrix(t *testing.T) {
 			require.NoError(t, db.Where("model_name = ?", "new-text").First(&metadata).Error)
 			assert.NotZero(t, metadata.VendorID)
 			assert.NotEqual(t, 52, metadata.VendorID)
+			var localPrices struct {
+				Success bool
+				Data    struct {
+					Sales       billing_setting.OpenLuxSales
+					GroupRatios map[string]float64 `json:"group_ratios"`
+				}
+			}
+			localResponse := modelManagementRequest(t, GetPublishedOpenLuxSales, http.MethodGet, "/api/ratio_sync/openlux/sales", nil, &localPrices)
+			require.True(t, localPrices.Success, localResponse.Body.String())
+			assert.Equal(t, "no-store", localResponse.Header().Get("Cache-Control"))
+			assert.Equal(t, 0.1, localPrices.Data.GroupRatios["sale-a"])
+			assert.Equal(t, imported.Expression, localPrices.Data.Sales["sale-a"].Models["new-text"].Expression)
+			assert.NotContains(t, localResponse.Body.String(), "fixture-a-secret")
+			assert.NotContains(t, localResponse.Body.String(), "fixture-b-secret")
 			assert.Equal(t, 0.1, ratio_setting.GetGroupRatio("sale-a"))
 			assert.Equal(t, 0.2, ratio_setting.GetGroupRatio("sale-b"))
 			assert.Equal(t, 1.0, common.GetTopupGroupRatio("sale-a"))
@@ -841,6 +855,24 @@ func TestOpenLuxSalesPublishAndBillingDatabaseMatrix(t *testing.T) {
 			pricingIndex := slices.IndexFunc(public, func(item model.Pricing) bool { return item.ModelName == "catalog-text" })
 			require.NotEqual(t, -1, pricingIndex)
 			assert.Len(t, public[pricingIndex].GroupBillingExpr, 2)
+			currentRatios := ratio_setting.GroupRatio2JSONString()
+			require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(`{"sale-a":0.05501,"sale-b":0.2}`))
+			var publicResponse struct {
+				Success bool
+				Data    []model.Pricing
+				Ratios  map[string]float64 `json:"group_ratio"`
+			}
+			response = modelManagementRequest(t, GetPricing, http.MethodGet, "/api/pricing", nil, &publicResponse)
+			require.True(t, publicResponse.Success, response.Body.String())
+			assert.Equal(t, 0.0551, publicResponse.Ratios["sale-a"])
+			found := slices.IndexFunc(publicResponse.Data, func(item model.Pricing) bool { return item.ModelName == "catalog-text" })
+			require.NotEqual(t, -1, found)
+			cacheCost, _, err := billingexpr.RunExpr(publicResponse.Data[found].GroupBillingExpr["sale-a"], billingexpr.TokenParams{CR: 1000000, Len: 1000000})
+			require.NoError(t, err)
+			assert.InDelta(t, 0.0662, cacheCost/1000000*publicResponse.Ratios["sale-a"], 1e-12)
+			assert.Equal(t, public[pricingIndex].GroupBillingExpr, model.GetPricing()[pricingIndex].GroupBillingExpr, "per-request projection must not mutate the shared price cache")
+			require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(currentRatios))
+
 			assert.Contains(t, public[pricingIndex].GroupBillingExpr["sale-b"], "p * 12")
 			var snapshot *billingexpr.BillingSnapshot
 			for _, tc := range []struct {
@@ -1081,4 +1113,140 @@ func TestOpenLuxCatalogVersionTracksPricesInsteadOfPresentation(t *testing.T) {
 	_, _, rerouted, err := fetchOpenLuxCatalog(context.Background())
 	require.NoError(t, err)
 	assert.NotEqual(t, original, rerouted, "Protocol availability changes must invalidate the reviewed contract")
+}
+
+func TestPublishedOpenLuxPricesUseSavedContractsWithoutUpstream(t *testing.T) {
+	original, err := common.Marshal(billing_setting.GetOpenLuxSales())
+	require.NoError(t, err)
+	ratios := ratio_setting.GroupRatio2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, billing_setting.LoadOpenLuxSales(string(original)))
+		require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(ratios))
+	})
+	openLuxTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Error("reading local published prices must not contact OpenLux")
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
+	require.NoError(t, billing_setting.LoadOpenLuxSales(`{"saved":{"channel_id":7,"multiplier":1.2,"source_version":"saved-source","models":{"opus":{"cost":"tier(\"base\", p * 0.4412)","expression":"tier(\"base\", p * 6)"}}}}`))
+	require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(`{"saved":0}`))
+	var result struct {
+		Success bool
+		Data    struct {
+			Sales  billing_setting.OpenLuxSales
+			Ratios map[string]float64 `json:"group_ratios"`
+		}
+	}
+	response := modelManagementRequest(t, GetPublishedOpenLuxSales, http.MethodGet, "/api/ratio_sync/openlux/sales", nil, &result)
+	require.True(t, result.Success, response.Body.String())
+	assert.Zero(t, result.Data.Ratios["saved"])
+	assert.Equal(t, `tier("base", p * 6)`, result.Data.Sales["saved"].Models["opus"].Expression)
+	assert.Equal(t, "no-store", response.Header().Get("Cache-Control"))
+	require.Error(t, billing_setting.LoadOpenLuxSales("{invalid"))
+	result.Success = true
+	response = modelManagementRequest(t, GetPublishedOpenLuxSales, http.MethodGet, "/api/ratio_sync/openlux/sales", nil, &result)
+	assert.False(t, result.Success, response.Body.String())
+}
+
+func TestOpenLuxFourDecimalPricesMatchReservationAndSettlement(t *testing.T) {
+	original, err := common.Marshal(billing_setting.GetOpenLuxSales())
+	require.NoError(t, err)
+	ratios := ratio_setting.GroupRatio2JSONString()
+	special := ratio_setting.GroupGroupRatio2JSONString()
+	quotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 500000
+	t.Cleanup(func() {
+		require.NoError(t, billing_setting.LoadOpenLuxSales(string(original)))
+		require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(ratios))
+		require.NoError(t, ratio_setting.UpdateGroupGroupRatioByJSONString(special))
+		common.QuotaPerUnit = quotaPerUnit
+	})
+	for _, tc := range []struct {
+		name, expression string
+		ratio            float64
+		params           billingexpr.TokenParams
+		images           int
+		wantRatio        float64
+		wantQuota        int
+	}{
+		{"exact four digits stay exact", `tier("base", p * 0.18)`, 0.055, billingexpr.TokenParams{P: 1000000, Len: 1000000}, 1, 0.055, 4950},
+		{"binary importer noise is not a price increase", `tier("base", p * 0.18000000000000002)`, 0.055, billingexpr.TokenParams{P: 1000000, Len: 1000000}, 1, 0.055, 4950},
+		{"cache price rounds upward", `tier("base", p * 0.18 + cr * 0.09)`, 0.055, billingexpr.TokenParams{CR: 1000000, Len: 1000000}, 1, 0.055, 2500},
+		{"fifth digit one rounds upward", `tier("base", p * 0.00991)`, 1, billingexpr.TokenParams{P: 1000000, Len: 1000000}, 1, 1, 5000},
+		{"sixth digit rounds upward", `tier("base", p * 0.009901)`, 1, billingexpr.TokenParams{P: 1000000, Len: 1000000}, 1, 1, 5000},
+		{"rounded cache unit keeps quota half rounding", `tier("base", p * 0.09)`, 0.055, billingexpr.TokenParams{P: 200, Len: 200}, 1, 0.055, 1},
+		{"rounded input unit keeps quota half rounding", `tier("base", p * 0.18)`, 0.05501, billingexpr.TokenParams{P: 100, Len: 100}, 1, 0.0551, 1},
+		{"tiny positive price stays paid", `tier("base", p * 0.000001)`, 1, billingexpr.TokenParams{P: 1000000, Len: 1000000}, 1, 1, 50},
+		{"group ratio fifth digit one rounds upward", `tier("base", p * 0.18)`, 0.05501, billingexpr.TokenParams{P: 1000000, Len: 1000000}, 1, 0.0551, 5000},
+		{"group ratio sixth digit rounds upward", `tier("base", p * 0.18)`, 0.055001, billingexpr.TokenParams{P: 1000000, Len: 1000000}, 1, 0.0551, 5000},
+		{"tiny positive group stays paid", `tier("base", p * 0.18)`, 0.000001, billingexpr.TokenParams{P: 1000000, Len: 1000000}, 1, 0.0001, 50},
+		{"tier conditions keep original thresholds", `len <= 100000 ? tier("short", p * 0.00991) : tier("long", p * 0.01991)`, 1, billingexpr.TokenParams{P: 1000000, Len: 100001}, 1, 1, 10000},
+		{"fixed image unit rounds before quantity", `tier("image", fixed(0.00623)) * image_count`, 0.055, billingexpr.TokenParams{}, 3, 0.055, 600},
+		{"free group stays free", `tier("base", p * 0.18)`, 0, billingexpr.TokenParams{P: 1000000, Len: 1000000}, 1, 0, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			registry := billing_setting.OpenLuxSales{"rounded": {NormalizedPrices: true, ChannelID: 7, Multiplier: 1.2, SourceVersion: "saved", Models: map[string]billing_setting.OpenLuxSalePrice{"priced": {Cost: tc.expression, Expression: tc.expression}}}}
+			raw, err := common.Marshal(registry)
+			require.NoError(t, err)
+			require.NoError(t, billing_setting.LoadOpenLuxSales(string(raw)))
+			raw, err = common.Marshal(map[string]float64{"rounded": tc.ratio})
+			require.NoError(t, err)
+			require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(string(raw)))
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+			info := &relaycommon.RelayInfo{OriginModelName: "priced", UsingGroup: "rounded", UserGroup: "default", ChannelMeta: &relaycommon.ChannelMeta{ChannelId: 7}, BillingRequestInput: &billingexpr.RequestInput{ImageCount: &tc.images}}
+			price, err := helper.ModelPriceHelper(ctx, info, int(tc.params.P), nil)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantRatio, price.GroupRatioInfo.GroupRatio)
+			settled, err := billingexpr.ComputeTieredQuotaWithRequest(info.TieredBillingSnapshot, tc.params, *info.BillingRequestInput)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantQuota, settled.ActualQuotaAfterGroup)
+			var local struct {
+				Success bool
+				Data    struct {
+					Ratios    map[string]float64           `json:"group_ratios"`
+					Effective map[string]map[string]string `json:"effective_prices"`
+				}
+			}
+			response := modelManagementRequest(t, GetPublishedOpenLuxSales, http.MethodGet, "/api/ratio_sync/openlux/sales", nil, &local)
+			require.True(t, local.Success, response.Body.String())
+			assert.Equal(t, tc.wantRatio, local.Data.Ratios["rounded"])
+			cost, _, err := billingexpr.RunExprWithRequest(local.Data.Effective["rounded"]["priced"], tc.params, *info.BillingRequestInput)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantQuota, common.QuotaRound(cost/1000000*common.QuotaPerUnit), "admin unit prices match real deductions")
+			if tc.params.CR == 0 && !strings.Contains(tc.expression, "len <=") {
+				assert.Equal(t, tc.wantQuota, price.QuotaToPreConsume)
+			}
+			frozen := info.TieredBillingSnapshot
+			require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(`{"rounded":9}`))
+			again, err := billingexpr.ComputeTieredQuotaWithRequest(frozen, tc.params, *info.BillingRequestInput)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantQuota, again.ActualQuotaAfterGroup, "an in-flight request retains its price")
+		})
+	}
+	t.Run("user-specific absolute multipliers use the same precision", func(t *testing.T) {
+		require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(`{"rounded":0.11}`))
+		require.NoError(t, ratio_setting.UpdateGroupGroupRatioByJSONString(`{"vip":{"rounded":0.05501}}`))
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+		info := &relaycommon.RelayInfo{OriginModelName: "priced", UsingGroup: "rounded", UserGroup: "vip", ChannelMeta: &relaycommon.ChannelMeta{ChannelId: 7}, BillingRequestInput: &billingexpr.RequestInput{}}
+		price, err := helper.ModelPriceHelper(ctx, info, 1000000, nil)
+		require.NoError(t, err)
+		assert.Equal(t, 0.0551, price.GroupRatioInfo.GroupRatio)
+		assert.Equal(t, 0.0551, price.GroupRatioInfo.GroupSpecialRatio)
+		assert.Equal(t, 5000, price.QuotaToPreConsume)
+		assert.Equal(t, 0.11, ratio_setting.GetGroupRatio("rounded"))
+	})
+	for _, tc := range []struct {
+		expression string
+		ratio      float64
+	}{
+		{`tier("base", p * 0.18) * 2`, 0.1},
+		{`tier("base", p * -1)`, 0.1},
+		{`tier("base", p * 1)`, math.Inf(1)},
+		{`tier("base", p * 1)`, -0.1},
+	} {
+		_, err := billing_setting.OpenLuxPriceExpressions(tc.expression, tc.ratio)
+		require.Error(t, err, "unsupported or invalid contracts must fail closed")
+	}
+
 }

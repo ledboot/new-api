@@ -18,7 +18,15 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -52,6 +60,12 @@ import {
   normalizeJsonString,
   validateJsonString,
 } from './utils'
+
+const OpenLuxPublishedPrices = lazy(() =>
+  import('./openlux-published-prices').then((module) => ({
+    default: module.OpenLuxPublishedPrices,
+  }))
+)
 
 type Translate = (key: string, options?: Record<string, unknown>) => string
 
@@ -155,6 +169,7 @@ type RatioTabId =
   | 'groups'
   | 'tool-prices'
   | 'upstream-sync'
+  | 'openlux-prices'
 
 type RatioSettingsCardProps = {
   modelDefaults: ModelFormValues
@@ -459,6 +474,7 @@ export function RatioSettingsCard({
     groups: 'Group ratios',
     'tool-prices': 'Tool prices',
     'upstream-sync': 'Upstream price sync',
+    'openlux-prices': 'Published OpenLux prices',
   }
   const tabsGridClass =
     {
@@ -517,6 +533,13 @@ export function RatioSettingsCard({
         />
       )
     }
+    if (tab === 'openlux-prices') {
+      return (
+        <Suspense fallback={<LoadingState />}>
+          <OpenLuxPublishedPrices />
+        </Suspense>
+      )
+    }
     if (tab === 'tool-prices') {
       return <ToolPriceSettings defaultValue={toolPricesDefault} />
     }
@@ -558,7 +581,9 @@ export function RatioSettingsCard({
                 key={tab}
                 value={tab}
                 className={
-                  tab === 'models' || tab === 'unset-models'
+                  tab === 'models' ||
+                  tab === 'unset-models' ||
+                  tab === 'openlux-prices'
                     ? 'flex min-h-0 flex-col data-hidden:hidden'
                     : 'min-h-0'
                 }

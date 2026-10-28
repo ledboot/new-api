@@ -31,7 +31,6 @@ import { cn } from '@/lib/utils'
 
 type SystemBrandProps = {
   defaultName?: string
-  defaultVersion?: string
   /**
    * Visual layout:
    * - 'sidebar': stacked card style (used inside the sidebar header).
@@ -56,8 +55,6 @@ export function SystemBrand(props: SystemBrandProps) {
     ? systemName
     : props.defaultName || systemName
   const isTokara = name === DEFAULT_SYSTEM_NAME && logo === DEFAULT_LOGO
-  const version =
-    status?.version || props.defaultVersion || t('Unknown version')
 
   if (variant === 'inline') {
     return (
@@ -108,7 +105,6 @@ export function SystemBrand(props: SystemBrandProps) {
           </div>
           <div className='grid flex-1 text-start text-sm leading-tight group-data-[collapsible=icon]:hidden'>
             <span className='truncate font-semibold'>{name}</span>
-            <span className='truncate text-xs'>{version}</span>
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>
