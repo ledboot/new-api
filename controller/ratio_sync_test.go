@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
@@ -1249,4 +1250,43 @@ func TestOpenLuxFourDecimalPricesMatchReservationAndSettlement(t *testing.T) {
 		require.Error(t, err, "unsupported or invalid contracts must fail closed")
 	}
 
+}
+
+func TestOpenLuxPreflightUsesSelectedChannelBeforeMetadataInitialization(t *testing.T) {
+	require.NoError(t, i18n.Init())
+	modelManagementDB(t, "sqlite", "")
+	original, err := common.Marshal(billing_setting.GetOpenLuxSales())
+	require.NoError(t, err)
+	ratios := ratio_setting.GroupRatio2JSONString()
+	quotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 500000
+	t.Cleanup(func() {
+		require.NoError(t, billing_setting.LoadOpenLuxSales(string(original)))
+		require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(ratios))
+		common.QuotaPerUnit = quotaPerUnit
+	})
+	require.NoError(t, billing_setting.LoadOpenLuxSales(`{"Kiro-Claude-1":{"normalized_prices":true,"channel_id":10,"multiplier":1,"source_version":"fixture","models":{"claude-opus-4-7":{"cost":"tier(\"base\", p * 0.4412)","expression":"tier(\"base\", p * 5 + c * 25)"}}}}`))
+	require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(`{"Kiro-Claude-1":0.1103}`))
+	for _, path := range []string{"/v1/messages", "/v1/chat/completions", "/v1/responses", "/v1/images/generations"} {
+		t.Run(path, func(t *testing.T) {
+			for _, channelID := range []int{10, 11, 0} {
+				ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+				ctx.Request = httptest.NewRequest(http.MethodPost, path, nil)
+				ctx.Request.Header.Set("X-Channel-ID", "10")
+				common.SetContextKey(ctx, constant.ContextKeyChannelId, channelID)
+				info := &relaycommon.RelayInfo{OriginModelName: "claude-opus-4-7", UsingGroup: "Kiro-Claude-1", UserGroup: "default", BillingRequestInput: &billingexpr.RequestInput{}}
+				price, err := helper.ModelPriceHelper(ctx, info, 1000000, nil)
+				if channelID != 10 {
+					require.Error(t, err, "missing or unowned server-selected channels must still be rejected")
+					continue
+				}
+				require.NoError(t, err, "pre-consume happens before protocol handlers initialize ChannelMeta")
+				assert.Nil(t, info.ChannelMeta, "pricing must not initialize or reset protocol conversion state")
+				assert.Equal(t, 275750, price.QuotaToPreConsume)
+				settled, err := billingexpr.ComputeTieredQuota(info.TieredBillingSnapshot, billingexpr.TokenParams{P: 1000000, Len: 1000000})
+				require.NoError(t, err)
+				assert.Equal(t, price.QuotaToPreConsume, settled.ActualQuotaAfterGroup)
+			}
+		})
+	}
 }

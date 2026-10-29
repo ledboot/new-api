@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
@@ -80,7 +81,13 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 			groupModel = ratio_setting.RoutingMatchModelName(info.OriginModelName)
 			price, channelID, _ = billing_setting.GetOpenLuxSalePrice(info.UsingGroup, groupModel)
 		}
-		if price.Expression == "" || channelID != info.GetChannelID() {
+		selectedChannelID := info.GetChannelID()
+		if !info.HasChannelMeta() {
+			// Initial pre-consume precedes protocol metadata initialization. The
+			// distributor has already selected the channel in trusted context.
+			selectedChannelID = common.GetContextKeyInt(c, constant.ContextKeyChannelId)
+		}
+		if price.Expression == "" || channelID != selectedChannelID {
 			return hosttypes.PriceData{}, modelPriceNotConfiguredError(c, info.OriginModelName, info.UserId)
 		}
 		// Resolve the price from the server-selected group on every attempt, then
