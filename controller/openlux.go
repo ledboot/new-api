@@ -157,8 +157,13 @@ func fetchOpenLuxJSON(ctx context.Context, path, token string, out any) error {
 }
 
 func fetchOpenLuxCatalog(ctx context.Context) (*openLuxCatalog, *openLuxAccount, string, error) {
+	// With an account token OpenLux scopes the catalog to the account: models
+	// and group access then match what the operator sees after signing in.
+	// Anonymous requests only expose public group memberships, which hides some
+	// groups' models (for example Discounted-Gemini-1).
+	token := strings.TrimSpace(os.Getenv("OPENLUX_ACCOUNT_TOKEN"))
 	var raw map[string]json.RawMessage
-	if err := fetchOpenLuxJSON(ctx, "/api/pricing_new", "", &raw); err != nil {
+	if err := fetchOpenLuxJSON(ctx, "/api/pricing_new", token, &raw); err != nil {
 		return nil, nil, "", err
 	}
 	encodedSource, err := common.Marshal(raw)
@@ -181,7 +186,7 @@ func fetchOpenLuxCatalog(ctx context.Context) (*openLuxCatalog, *openLuxAccount,
 		seen[item.Name] = true
 	}
 	var account *openLuxAccount
-	if token := strings.TrimSpace(os.Getenv("OPENLUX_ACCOUNT_TOKEN")); token != "" {
+	if token != "" {
 		account = &openLuxAccount{}
 		if err := fetchOpenLuxJSON(ctx, "/api/user/self/groups", token, account); err != nil {
 			return nil, nil, "", err
