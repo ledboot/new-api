@@ -18,11 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import CherryStudioColor from '@lobehub/icons/es/CherryStudio/components/Color'
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, BookOpen, Code2, Route, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Code2, Route, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { cn } from '@/lib/utils'
 
@@ -35,11 +34,7 @@ const PROVIDERS = ['OpenAI', 'Anthropic', 'Google Gemini', 'DeepSeek']
 
 export function Hero(props: HeroProps) {
   const { t } = useTranslation()
-  const { status } = useStatus()
   const { logo, systemName } = useSystemConfig()
-  const docsUrl =
-    (status?.docs_link as string | undefined) || 'https://docs.newapi.pro'
-  const isExternalDocs = docsUrl.startsWith('http')
 
   return (
     <section
@@ -76,17 +71,12 @@ export function Hero(props: HeroProps) {
             'Access leading AI models through one API. Build with familiar tools and explore more possibilities.'
           )}
         </p>
-        <div className='mt-7 flex flex-wrap items-center justify-center gap-3'>
-          <Button
-            className='h-12 px-6'
-            render={
-              <Link to={props.isAuthenticated ? '/dashboard' : '/sign-up'} />
-            }
-          >
-            {props.isAuthenticated ? t('Go to Dashboard') : t('Get Started')}
-            <ArrowRight className='size-4' aria-hidden='true' />
-          </Button>
-          {!props.isAuthenticated && (
+        {!props.isAuthenticated && (
+          <div className='mt-7 flex flex-wrap items-center justify-center gap-3'>
+            <Button className='h-12 px-6' render={<Link to='/sign-up' />}>
+              {t('Get Started')}
+              <ArrowRight className='size-4' aria-hidden='true' />
+            </Button>
             <Button
               variant='outline'
               className='h-12 px-6'
@@ -94,22 +84,8 @@ export function Hero(props: HeroProps) {
             >
               {t('View Pricing')}
             </Button>
-          )}
-          <Button
-            variant='outline'
-            className='h-12 px-6'
-            render={
-              isExternalDocs ? (
-                <a href={docsUrl} target='_blank' rel='noopener noreferrer' />
-              ) : (
-                <Link to={docsUrl} />
-              )
-            }
-          >
-            <BookOpen className='size-4' aria-hidden='true' />
-            {t('Docs')}
-          </Button>
-        </div>
+          </div>
+        )}
 
         <div className='tokara-connection-stage mx-auto mt-12 max-w-5xl overflow-hidden rounded-xl border'>
           <p className='text-primary px-4 pt-6 text-[10px] tracking-[0.16em] uppercase'>

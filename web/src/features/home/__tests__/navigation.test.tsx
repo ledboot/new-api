@@ -92,39 +92,30 @@ describe('Tokara home navigation', () => {
     expect(heading.closest('section')).toHaveClass('px-5')
   })
 
-  it('keeps the dashboard entry for signed-in users', async () => {
+  it('hides the call-to-action row for signed-in users', async () => {
     await renderHero(true)
 
     expect(
-      await screen.findByRole('button', { name: 'Go to Dashboard' })
-    ).toHaveAttribute('href', '/dashboard')
+      screen.queryByRole('button', { name: 'Go to Dashboard' })
+    ).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'Get Started' })
     ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Docs' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'View Pricing' })
+    ).not.toBeInTheDocument()
   })
 
-  it.each([
-    {
-      docsLink: undefined,
-      expected: 'https://docs.newapi.pro',
-      target: '_blank',
-    },
-    {
-      docsLink: 'https://docs.example.com/guide',
-      expected: 'https://docs.example.com/guide',
-      target: '_blank',
-    },
-    { docsLink: '/about', expected: '/about', target: null },
-  ])(
-    'preserves the configured documentation destination $expected',
-    async ({ docsLink, expected, target }) => {
-      await renderHero(false, docsLink)
+  it('no longer offers a documentation button in the hero', async () => {
+    await renderHero(false, '/docs')
 
-      const link = await screen.findByRole('button', { name: 'Docs' })
-      expect(link).toHaveAttribute('href', expected)
-      expect(link.getAttribute('target')).toBe(target)
-    }
-  )
+    expect(
+      screen.queryByRole('button', { name: 'Docs' })
+    ).not.toBeInTheDocument()
+  })
 
   it('keeps a long custom site name within its diagram node', async () => {
     const name = 'My custom gateway with a very long display name'
