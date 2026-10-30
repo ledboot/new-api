@@ -23,36 +23,7 @@ import { toast } from 'sonner'
 import { handleServerError } from '@/lib/handle-server-error'
 
 import { requestWaffoPancakePayment, isApiSuccess } from '../api'
-import { getPaymentErrorTranslation } from '../lib'
-
-function getCheckoutUrl(data: unknown): string | null {
-  if (!data || typeof data !== 'object') {
-    return null
-  }
-
-  if ('checkout_url' in data && typeof data.checkout_url === 'string') {
-    return data.checkout_url
-  }
-
-  return null
-}
-
-/**
- * Reject non-navigable schemes (e.g. javascript:, data:) and relative URLs.
- * Only http/https are allowed for backend-provided redirect targets.
- */
-function isSafeHttpCheckoutUrl(value: string): boolean {
-  const trimmed = value.trim()
-  if (!trimmed) {
-    return false
-  }
-  try {
-    const u = new URL(trimmed)
-    return u.protocol === 'http:' || u.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
+import { getPaymentErrorTranslation, getHostedCheckoutUrl } from '../lib'
 
 function getErrorMessage(message: string | undefined, data: unknown): string {
   if (typeof data === 'string' && data.trim()) {
@@ -84,13 +55,9 @@ export function useWaffoPancakePayment() {
         })
 
         if (isApiSuccess(response)) {
-          const checkoutUrl = getCheckoutUrl(response.data)
+          const checkoutUrl = getHostedCheckoutUrl(response.data)
 
           if (checkoutUrl) {
-            if (!isSafeHttpCheckoutUrl(checkoutUrl)) {
-              toast.error(i18next.t('Invalid payment redirect URL'))
-              return false
-            }
             toast.success(i18next.t('Redirecting to payment page...'))
             window.location.href = checkoutUrl
             return true

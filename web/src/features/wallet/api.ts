@@ -246,3 +246,21 @@ export async function completeOrder(
   const res = await api.post('/api/user/topup/complete', request)
   return res.data
 }
+
+export async function calculateBepusdtAmount(
+  request: AmountRequest
+): Promise<AmountResponse> {
+  const res = await api.post('/api/user/bepusdt/amount', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+export async function requestBepusdtPayment(
+  request: AmountRequest
+): Promise<ApiResponse<{ checkout_url: string }>> {
+  const res = await api.post('/api/user/bepusdt/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return res.data
+}

@@ -6,6 +6,7 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -28,6 +29,8 @@ func GetTopUpInfo(c *gin.Context) {
 
 	// 获取支付方式
 	payMethods := operation_setting.PayMethods
+	payMethods = append([]map[string]string(nil), payMethods...)
+	payMethods = slices.DeleteFunc(payMethods, func(method map[string]string) bool { return method["type"] == model.PaymentMethodBepusdt })
 	if !complianceConfirmed {
 		payMethods = []map[string]string{}
 	}
@@ -97,7 +100,32 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
+	enableBepusdt := isBepusdtTopUpEnabled()
+	bepusdtMin := int64(setting.BepusdtMinTopUp)
+	bepusdtPrice := setting.BepusdtUnitPrice
+	if enableBepusdt {
+		if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+			minimum, err := common.WalletQuotaFromDecimalStrict(decimal.NewFromInt(bepusdtMin).Mul(decimal.NewFromFloat(common.QuotaPerUnit)))
+			if err != nil {
+				enableBepusdt = false
+			} else {
+				bepusdtMin = int64(minimum)
+			}
+		}
+		if group, err := model.GetUserGroup(c.GetInt("id"), true); err == nil {
+			ratio := common.GetTopupGroupRatio(group)
+			if ratio > 0 {
+				bepusdtPrice *= ratio
+			}
+		}
+	}
+	if enableBepusdt {
+		payMethods = append(payMethods, map[string]string{"name": "BEpusdt", "type": model.PaymentMethodBepusdt, "min_topup": strconv.FormatInt(bepusdtMin, 10)})
+	}
 	data := gin.H{
+		"enable_bepusdt_topup":             enableBepusdt,
+		"bepusdt_unit_price":               bepusdtPrice,
+		"bepusdt_min_topup":                bepusdtMin,
 		"enable_online_topup":              isEpayTopUpEnabled(),
 		"enable_stripe_topup":              isStripeTopUpEnabled(),
 		"enable_creem_topup":               isCreemTopUpEnabled(),

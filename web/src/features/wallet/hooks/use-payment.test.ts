@@ -47,3 +47,25 @@ describe('payment amount routing', () => {
     expect(calls).toEqual(['waffo:120'])
   })
 })
+
+test('BEpusdt quotes use their USD calculator rather than the local-currency gateway', async () => {
+  const amount = await requestPaymentAmount(10, PAYMENT_TYPES.BEPUSDT, {
+    bepusdt: async (request) => ({
+      success: true,
+      data: String(request.amount * 1.2),
+    }),
+    regular: async () => {
+      throw new Error('local currency calculator must not run')
+    },
+    stripe: async () => {
+      throw new Error('Stripe calculator must not run')
+    },
+    waffo: async () => {
+      throw new Error('Waffo calculator must not run')
+    },
+    waffoPancake: async () => {
+      throw new Error('Pancake calculator must not run')
+    },
+  })
+  expect(amount).toBe(12)
+})

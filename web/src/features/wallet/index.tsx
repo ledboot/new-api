@@ -315,7 +315,16 @@ export function Wallet(props: WalletProps) {
                   redeeming={redeeming}
                   topupLink={topupInfo?.topup_link}
                   loading={topupLoading}
-                  priceRatio={(status?.price as number) || 1}
+                  paymentCurrency={
+                    getCurrentPaymentType() === PAYMENT_TYPES.BEPUSDT
+                      ? ' USD'
+                      : ''
+                  }
+                  priceRatio={
+                    getCurrentPaymentType() === PAYMENT_TYPES.BEPUSDT
+                      ? topupInfo?.bepusdt_unit_price || 1
+                      : (status?.price as number) || 1
+                  }
                   usdExchangeRate={effectiveUsdExchangeRate}
                   onOpenBilling={() => setBillingDialogOpen(true)}
                   creemProducts={topupInfo?.creem_products}

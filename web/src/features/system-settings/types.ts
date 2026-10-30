@@ -320,6 +320,11 @@ export type BillingSettings = {
   'payment_setting.compliance_confirmed_at': number
   'payment_setting.compliance_confirmed_by': number
   'payment_setting.compliance_confirmed_ip': string
+  BepusdtApiURL: string
+  BepusdtApiToken: string
+  BepusdtTradeType: string
+  BepusdtUnitPrice: number
+  BepusdtMinTopUp: number
   StripeApiSecret: string
   StripeWebhookSecret: string
   StripePriceId: string

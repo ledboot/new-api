@@ -147,6 +147,9 @@ export interface TopupInfo {
   /** Minimum topup amount for Waffo */
   waffo_min_topup?: number
   /** Whether Waffo Pancake topup is enabled */
+  enable_bepusdt_topup?: boolean
+  bepusdt_min_topup?: number
+  bepusdt_unit_price?: number
   enable_waffo_pancake_topup?: boolean
   /** Minimum topup amount for Waffo Pancake */
   waffo_pancake_min_topup?: number
@@ -265,6 +268,7 @@ export interface TopupRecord {
   trade_no: string
   /** Payment method type */
   payment_method: string
+  payment_provider?: string
   /** Creation timestamp */
   create_time: number
   /** Completion timestamp */

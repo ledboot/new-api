@@ -26,6 +26,7 @@ import { toast } from 'sonner'
 import * as z from 'zod'
 
 import { JsonCodeEditor } from '@/components/json-code-editor'
+import { PasswordInput } from '@/components/password-input'
 import { RiskAcknowledgementDialog } from '@/components/risk-acknowledgement-dialog'
 import {
   Alert,
@@ -143,6 +144,16 @@ const paymentSchema = z.object({
       })
     }
   }),
+  BepusdtApiURL: z
+    .string()
+    .refine(
+      (v) => !v || /^https?:\/\//.test(v),
+      'Provide a valid callback URL starting with http:// or https://'
+    ),
+  BepusdtApiToken: z.string(),
+  BepusdtTradeType: z.string().min(1),
+  BepusdtUnitPrice: z.coerce.number().positive(),
+  BepusdtMinTopUp: z.coerce.number().int().min(1).max(1000000),
   StripeApiSecret: z.string(),
   StripeWebhookSecret: z.string(),
   StripePriceId: z.string(),
@@ -429,6 +440,11 @@ export function PaymentSettingsSection({
       PayMethods: values.PayMethods.trim(),
       AmountOptions: values.AmountOptions.trim(),
       AmountDiscount: values.AmountDiscount.trim(),
+      BepusdtApiURL: values.BepusdtApiURL.trim(),
+      BepusdtApiToken: values.BepusdtApiToken.trim(),
+      BepusdtTradeType: values.BepusdtTradeType.trim(),
+      BepusdtUnitPrice: values.BepusdtUnitPrice,
+      BepusdtMinTopUp: values.BepusdtMinTopUp,
       StripeApiSecret: values.StripeApiSecret.trim(),
       StripeWebhookSecret: values.StripeWebhookSecret.trim(),
       StripePriceId: values.StripePriceId.trim(),
@@ -473,6 +489,11 @@ export function PaymentSettingsSection({
       PayMethods: initialRef.current.PayMethods.trim(),
       AmountOptions: initialRef.current.AmountOptions.trim(),
       AmountDiscount: initialRef.current.AmountDiscount.trim(),
+      BepusdtApiURL: initialRef.current.BepusdtApiURL.trim(),
+      BepusdtApiToken: initialRef.current.BepusdtApiToken.trim(),
+      BepusdtTradeType: initialRef.current.BepusdtTradeType.trim(),
+      BepusdtUnitPrice: initialRef.current.BepusdtUnitPrice,
+      BepusdtMinTopUp: initialRef.current.BepusdtMinTopUp,
       StripeApiSecret: initialRef.current.StripeApiSecret.trim(),
       StripeWebhookSecret: initialRef.current.StripeWebhookSecret.trim(),
       StripePriceId: initialRef.current.StripePriceId.trim(),
@@ -509,6 +530,22 @@ export function PaymentSettingsSection({
     }
 
     const updates: Array<{ key: string; value: string | number | boolean }> = []
+
+    const bepusdtKeys = [
+      'BepusdtApiURL',
+      'BepusdtApiToken',
+      'BepusdtTradeType',
+      'BepusdtUnitPrice',
+      'BepusdtMinTopUp',
+    ] as const
+    for (const key of bepusdtKeys) {
+      if (
+        sanitized[key] !== initial[key] &&
+        (key !== 'BepusdtApiToken' || sanitized[key])
+      ) {
+        updates.push({ key, value: sanitized[key] })
+      }
+    }
 
     if (sanitized.PayAddress !== initial.PayAddress) {
       updates.push({ key: 'PayAddress', value: sanitized.PayAddress })
@@ -882,15 +919,130 @@ export function PaymentSettingsSection({
           />
           <Tabs defaultValue='general' className='min-w-0'>
             <div className='overflow-x-auto pb-1'>
-              <TabsList className='grid min-w-[44rem] grid-cols-6'>
+              <TabsList className='grid min-w-[50rem] grid-cols-7'>
                 <TabsTrigger value='general'>{t('General')}</TabsTrigger>
                 <TabsTrigger value='epay'>Epay</TabsTrigger>
+                <TabsTrigger value='bepusdt'>BEpusdt</TabsTrigger>
                 <TabsTrigger value='stripe'>{t('Stripe')}</TabsTrigger>
                 <TabsTrigger value='creem'>Creem</TabsTrigger>
                 <TabsTrigger value='waffo-pancake'>Waffo Pancake</TabsTrigger>
                 <TabsTrigger value='waffo'>Waffo</TabsTrigger>
               </TabsList>
             </div>
+
+            <TabsContent value='bepusdt' className={paymentTabContentClassName}>
+              <div className='space-y-6'>
+                <p className='text-muted-foreground text-sm'>
+                  {t(
+                    'BEpusdt orders are charged in USD. The gateway converts the amount to the selected cryptocurrency.'
+                  )}
+                </p>
+                <div className='grid gap-6 md:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='BepusdtApiURL'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Gateway URL')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder='https://pay.example.com'
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='BepusdtApiToken'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('API Token')}</FormLabel>
+                        <FormControl>
+                          <PasswordInput
+                            {...field}
+                            autoComplete='new-password'
+                            placeholder={t(
+                              'Leave blank to keep the current token'
+                            )}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='BepusdtTradeType'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Payment network')}</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder='usdt.trc20' />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Use a BEpusdt trade type, such as usdt.trc20 or usdt.erc20.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='BepusdtUnitPrice'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t('USD charged per USD of balance')}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type='number'
+                            min={0.01}
+                            step='0.01'
+                            {...safeNumberFieldProps(field)}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Top-up group ratios and preset discounts also apply.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name='BepusdtMinTopUp'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Minimum Topup')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='number'
+                            min={1}
+                            step='1'
+                            {...safeNumberFieldProps(field)}
+                          />
+                        </FormControl>
+                        <FormDescription>USD</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <p className='text-muted-foreground text-sm'>
+                  {t(
+                    'Payment notifications are sent automatically to /api/bepusdt/notify on the configured callback domain.'
+                  )}
+                </p>
+              </div>
+            </TabsContent>
 
             <TabsContent value='general' className={paymentTabContentClassName}>
               <div className='space-y-4'>

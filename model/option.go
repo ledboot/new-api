@@ -2,6 +2,8 @@ package model
 
 import (
 	"maps"
+	"math"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -123,6 +125,11 @@ func InitOptionMap() {
 	common.OptionMap["WaffoMinTopUp"] = strconv.Itoa(setting.WaffoMinTopUp)
 	common.OptionMap["WaffoPayMethods"] = setting.WaffoPayMethods2JsonString()
 	common.OptionMap["WaffoPancakeMerchantID"] = setting.WaffoPancakeMerchantID
+	common.OptionMap["BepusdtApiURL"] = setting.BepusdtApiURL
+	common.OptionMap["BepusdtApiToken"] = setting.BepusdtApiToken
+	common.OptionMap["BepusdtTradeType"] = setting.BepusdtTradeType
+	common.OptionMap["BepusdtUnitPrice"] = strconv.FormatFloat(setting.BepusdtUnitPrice, 'f', -1, 64)
+	common.OptionMap["BepusdtMinTopUp"] = strconv.Itoa(setting.BepusdtMinTopUp)
 	common.OptionMap["WaffoPancakePrivateKey"] = setting.WaffoPancakePrivateKey
 	common.OptionMap["WaffoPancakeReturnURL"] = setting.WaffoPancakeReturnURL
 	common.OptionMap["WaffoPancakeUnitPrice"] = strconv.FormatFloat(setting.WaffoPancakeUnitPrice, 'f', -1, 64)
@@ -244,6 +251,29 @@ func SyncOptions(frequency int) {
 }
 
 func validateOptionValue(key string, value string) error {
+	switch key {
+	case "BepusdtApiURL":
+		if value != "" {
+			u, err := url.Parse(value)
+			if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+				return common.NewMessage("Invalid parameters")
+			}
+		}
+	case "BepusdtUnitPrice":
+		n, err := strconv.ParseFloat(value, 64)
+		if err != nil || n <= 0 || math.IsNaN(n) || math.IsInf(n, 0) {
+			return common.NewMessage("Invalid parameters")
+		}
+	case "BepusdtMinTopUp":
+		n, err := strconv.Atoi(value)
+		if err != nil || n <= 0 || n > 1000000 {
+			return common.NewMessage("Invalid parameters")
+		}
+	case "BepusdtTradeType":
+		if value == "" || len(value) > 64 || strings.ContainsAny(value, " \t\r\n") {
+			return common.NewMessage("Invalid parameters")
+		}
+	}
 	if key == billing_setting.OpenLuxSalesOption {
 		return common.NewMessage("Use the OpenLux sales workflow to update managed groups")
 	}
@@ -612,6 +642,16 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.WaffoMinTopUp, _ = strconv.Atoi(value)
 	case "WaffoPancakeMerchantID":
 		setting.WaffoPancakeMerchantID = value
+	case "BepusdtApiURL":
+		setting.BepusdtApiURL = value
+	case "BepusdtApiToken":
+		setting.BepusdtApiToken = value
+	case "BepusdtTradeType":
+		setting.BepusdtTradeType = value
+	case "BepusdtUnitPrice":
+		setting.BepusdtUnitPrice, _ = strconv.ParseFloat(value, 64)
+	case "BepusdtMinTopUp":
+		setting.BepusdtMinTopUp, _ = strconv.Atoi(value)
 	case "WaffoPancakePrivateKey":
 		setting.WaffoPancakePrivateKey = value
 	case "WaffoPancakeReturnURL":

@@ -31,6 +31,7 @@ const (
 	PaymentMethodWaffo        = "waffo"
 	PaymentMethodWaffoPancake = "waffo_pancake"
 	PaymentMethodBalance      = "balance"
+	PaymentMethodBepusdt      = "bepusdt"
 )
 
 const (
@@ -40,6 +41,7 @@ const (
 	PaymentProviderWaffo        = "waffo"
 	PaymentProviderWaffoPancake = "waffo_pancake"
 	PaymentProviderBalance      = "balance"
+	PaymentProviderBepusdt      = "bepusdt"
 )
 
 var (
@@ -711,5 +713,57 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 		RecordLog(topUp.UserId, LogTypeTopup, common.NewMessage("{{provider}} top-up succeeded, amount added: {{quota}}, payment amount: {{amount}}", map[string]any{"provider": "Waffo Pancake", "quota": logger.FormatQuota(quotaToAdd), "amount": fmt.Sprintf("%.2f", topUp.Money)}))
 	}
 
+	return nil
+}
+
+// RechargeBepusdt settles only the saved fixed-amount USD order. Neither the
+// callback's crypto amount nor current gateway settings determine the credit.
+func RechargeBepusdt(tradeNo string, paidUSD decimal.Decimal, callerIP string) error {
+	if tradeNo == "" || !paidUSD.IsPositive() {
+		return ErrTopUpNotFound
+	}
+	var topUp TopUp
+	var creditedQuota int
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		if err := lockForUpdate(tx).Where("trade_no = ?", tradeNo).First(&topUp).Error; err != nil {
+			return ErrTopUpNotFound
+		}
+		if topUp.PaymentProvider != PaymentProviderBepusdt || topUp.PaymentMethod != PaymentMethodBepusdt {
+			return ErrPaymentMethodMismatch
+		}
+		if !paidUSD.Equal(decimal.NewFromFloat(topUp.Money)) {
+			return errors.New("payment amount mismatch")
+		}
+		if topUp.Status == common.TopUpStatusSuccess {
+			return nil
+		}
+		if topUp.Status != common.TopUpStatusPending {
+			return ErrTopUpStatusInvalid
+		}
+		quota, err := common.WalletQuotaFromDecimalStrict(decimal.NewFromInt(topUp.Amount).Mul(decimal.NewFromFloat(common.QuotaPerUnit)))
+		if err != nil || quota <= 0 {
+			return ErrInvalidTopUpQuota
+		}
+		result := tx.Model(&TopUp{}).Where("id = ? AND status = ?", topUp.Id, common.TopUpStatusPending).
+			Updates(map[string]any{"status": common.TopUpStatusSuccess, "complete_time": common.GetTimestamp()})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrTopUpStatusInvalid
+		}
+		if err := creditTopUpQuota(tx, topUp.UserId, quota, nil); err != nil {
+			return err
+		}
+		creditedQuota = quota
+		return nil
+	})
+	if err != nil || creditedQuota == 0 {
+		return err
+	}
+	syncCreditUserQuotaCache(topUp.UserId, creditedQuota, common.LogText("BEpusdt topup"))
+	RecordTopupLog(topUp.UserId, common.NewMessage("{{provider}} top-up succeeded, amount added: {{quota}}, payment amount: {{amount}}", map[string]any{
+		"provider": "BEpusdt", "quota": logger.FormatQuota(creditedQuota), "amount": fmt.Sprintf("%.2f USD", topUp.Money),
+	}), callerIP, PaymentMethodBepusdt, PaymentProviderBepusdt)
 	return nil
 }

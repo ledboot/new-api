@@ -70,6 +70,7 @@ interface RechargeFormCardProps {
   redeeming: boolean
   topupLink?: string
   loading?: boolean
+  paymentCurrency?: string
   priceRatio?: number
   usdExchangeRate?: number
   onOpenBilling?: () => void
@@ -100,6 +101,7 @@ export function RechargeFormCard({
   redeeming,
   topupLink,
   loading,
+  paymentCurrency = '',
   priceRatio = 1,
   usdExchangeRate = 1,
   onOpenBilling,
@@ -131,6 +133,7 @@ export function RechargeFormCard({
   }
 
   const hasConfigurableTopup =
+    topupInfo?.enable_bepusdt_topup ||
     topupInfo?.enable_online_topup ||
     topupInfo?.enable_stripe_topup ||
     enableWaffoTopup ||
@@ -271,8 +274,12 @@ export function RechargeFormCard({
                                 t={t}
                                 i18nKey='Pay {{amount}} <savings>• Save {{saved}}</savings>'
                                 values={{
-                                  amount: formatCurrency(actualPrice),
-                                  saved: formatCurrency(savedAmount),
+                                  amount:
+                                    formatCurrency(actualPrice) +
+                                    paymentCurrency,
+                                  saved:
+                                    formatCurrency(savedAmount) +
+                                    paymentCurrency,
                                 }}
                                 components={{
                                   savings: <span className='text-green-600' />,
@@ -280,7 +287,8 @@ export function RechargeFormCard({
                               />
                             ) : (
                               t('Pay {{amount}}', {
-                                amount: formatCurrency(actualPrice),
+                                amount:
+                                  formatCurrency(actualPrice) + paymentCurrency,
                               })
                             )}
                           </div>
@@ -317,6 +325,7 @@ export function RechargeFormCard({
                     ) : (
                       <span className='text-sm font-semibold'>
                         {formatCurrency(paymentAmount)}
+                        {paymentCurrency}
                       </span>
                     )}
                   </div>

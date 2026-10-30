@@ -23,6 +23,8 @@ import { toast } from 'sonner'
 import { handleServerError } from '@/lib/handle-server-error'
 
 import {
+  calculateBepusdtAmount,
+  requestBepusdtPayment,
   calculateAmount,
   calculateStripeAmount,
   calculateWaffoAmount,
@@ -31,11 +33,13 @@ import {
   requestStripePayment,
   isApiSuccess,
 } from '../api'
+import { PAYMENT_TYPES } from '../constants'
 import {
   isStripePayment,
   isWaffoPayment,
   isWaffoPancakePayment,
   submitPaymentForm,
+  getHostedCheckoutUrl,
 } from '../lib'
 import type { AmountRequest, AmountResponse } from '../types'
 
@@ -46,6 +50,7 @@ import type { AmountRequest, AmountResponse } from '../types'
 type AmountCalculator = (request: AmountRequest) => Promise<AmountResponse>
 
 export interface PaymentAmountCalculators {
+  bepusdt?: AmountCalculator
   regular: AmountCalculator
   stripe: AmountCalculator
   waffo: AmountCalculator
@@ -53,6 +58,7 @@ export interface PaymentAmountCalculators {
 }
 
 const defaultPaymentAmountCalculators: PaymentAmountCalculators = {
+  bepusdt: calculateBepusdtAmount,
   regular: calculateAmount,
   stripe: calculateStripeAmount,
   waffo: calculateWaffoAmount,
@@ -65,7 +71,9 @@ export async function requestPaymentAmount(
   calculators: PaymentAmountCalculators = defaultPaymentAmountCalculators
 ): Promise<number> {
   let calculator = calculators.regular
-  if (isStripePayment(paymentType)) {
+  if (paymentType === PAYMENT_TYPES.BEPUSDT) {
+    calculator = calculators.bepusdt ?? calculateBepusdtAmount
+  } else if (isStripePayment(paymentType)) {
     calculator = calculators.stripe
   } else if (isWaffoPayment(paymentType)) {
     calculator = calculators.waffo
@@ -112,6 +120,19 @@ export function usePayment() {
     async (topupAmount: number, paymentType: string) => {
       try {
         setProcessing(true)
+
+        if (paymentType === PAYMENT_TYPES.BEPUSDT) {
+          const response = await requestBepusdtPayment({
+            amount: Math.floor(topupAmount),
+          })
+          const checkoutUrl = getHostedCheckoutUrl(response.data)
+          if (!isApiSuccess(response) || !checkoutUrl) {
+            handleServerError(response, i18next.t('Payment request failed'))
+            return false
+          }
+          window.location.assign(checkoutUrl)
+          return true
+        }
 
         const isStripe = isStripePayment(paymentType)
         const amount = Math.floor(topupAmount)

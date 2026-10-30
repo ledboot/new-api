@@ -19,8 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 import { describe, expect, test } from 'vitest'
 
 import { PAYMENT_TYPES } from '../constants'
+import type { TopupInfo } from '../types'
 import {
   dispatchSelectedPayment,
+  getHostedCheckoutUrl,
+  getMinTopupAmount,
   isStripePayment,
   isWaffoPayment,
   isWaffoPancakePayment,
@@ -82,4 +85,32 @@ describe('payment dispatch', () => {
     expect(success).toBe(false)
     expect(called).toBe(false)
   })
+})
+
+describe('BEpusdt hosted checkout', () => {
+  test('validates hosted URLs shared by BEpusdt and Pancake', () => {
+    expect(
+      getHostedCheckoutUrl({
+        checkout_url: 'https://pay.example.com/checkout/1',
+      })
+    ).toBe('https://pay.example.com/checkout/1')
+    for (const url of [
+      'javascript:alert(1)',
+      'data:text/html,test',
+      '/checkout/1',
+      'https://user:secret@pay.example.com/',
+    ]) {
+      expect(getHostedCheckoutUrl({ checkout_url: url })).toBeNull()
+    }
+    expect(getHostedCheckoutUrl({ checkout_url: 1 })).toBeNull()
+    expect(getHostedCheckoutUrl(null)).toBeNull()
+  })
+})
+
+test('BEpusdt-only minimum does not override the existing default gateway minimum', () => {
+  const info = { enable_bepusdt_topup: true, bepusdt_min_topup: 5 } as TopupInfo
+  expect(getMinTopupAmount(info)).toBe(5)
+  expect(
+    getMinTopupAmount({ ...info, enable_online_topup: true, min_topup: 1 })
+  ).toBe(1)
 })

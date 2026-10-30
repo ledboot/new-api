@@ -46,6 +46,27 @@ export function getPaymentErrorTranslation(
   return getServerMessage(body)
 }
 
+export function getHostedCheckoutUrl(data: unknown): string | null {
+  if (
+    !data ||
+    typeof data !== 'object' ||
+    !('checkout_url' in data) ||
+    typeof data.checkout_url !== 'string'
+  ) {
+    return null
+  }
+  try {
+    const url = new URL(data.checkout_url.trim())
+    return ['https:', 'http:'].includes(url.protocol) &&
+      !url.username &&
+      !url.password
+      ? url.href
+      : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Check if browser is Safari
  */
@@ -187,6 +208,10 @@ export function getMinTopupAmount(topupInfo: TopupInfo | null): number {
 
   if (topupInfo.enable_waffo_pancake_topup) {
     return topupInfo.waffo_pancake_min_topup || DEFAULT_MIN_TOPUP
+  }
+
+  if (topupInfo.enable_bepusdt_topup) {
+    return topupInfo.bepusdt_min_topup || DEFAULT_MIN_TOPUP
   }
 
   return DEFAULT_MIN_TOPUP
