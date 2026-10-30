@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+import { requireServerSuccess } from '@/lib/server-error-message'
 
 import type {
   RedemptionRequest,
@@ -263,4 +264,47 @@ export async function requestBepusdtPayment(
     skipBusinessError: true,
   } as Record<string, unknown>)
   return res.data
+}
+
+export interface ChannelCheckout {
+  kind: 'qr' | 'redirect'
+  checkout_url?: string
+  qr_code?: string
+  crypto_amount?: string
+  network?: string
+  expires_at?: number
+  order_id: string
+  currency: string
+  amount: string
+}
+
+export async function calculateChannelAmount(
+  paymentType: string,
+  amount: number
+): Promise<AmountResponse> {
+  const response = await api.post('/api/user/payment/amount', {
+    payment_method: paymentType,
+    amount,
+  })
+  return response.data
+}
+
+export async function requestChannelPayment(
+  paymentType: string,
+  amount: number
+): Promise<ApiResponse<ChannelCheckout>> {
+  const response = await api.post('/api/user/payment/checkout', {
+    payment_method: paymentType,
+    amount,
+  })
+  return response.data
+}
+
+export async function getChannelPaymentStatus(
+  orderID: string
+): Promise<string> {
+  const response = await api.get(
+    `/api/user/payment/orders/${encodeURIComponent(orderID)}`
+  )
+  return requireServerSuccess(response.data).data.status
 }

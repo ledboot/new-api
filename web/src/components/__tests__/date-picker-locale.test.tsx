@@ -48,7 +48,7 @@ afterEach(async () => {
   await act(() => i18next.changeLanguage('en'))
 })
 
-test('uses Chinese calendar locales for zhCN and zhTW in both date pickers', async () => {
+test('uses the Chinese calendar locale in both date pickers', async () => {
   await setInterfaceLanguage('zhCN')
   const datePicker = render(
     <DatePicker selected={selected} onSelect={() => undefined} />
@@ -61,14 +61,4 @@ test('uses Chinese calendar locales for zhCN and zhTW in both date pickers', asy
   )
   expect(await openCalendar()).toHaveTextContent('zh-CN')
   dateTimePicker.unmount()
-
-  await setInterfaceLanguage('zhTW')
-  render(<DatePicker selected={selected} onSelect={() => undefined} />)
-  expect(await openCalendar()).toHaveTextContent('zh-TW')
-})
-
-test('keeps French on the French calendar locale', async () => {
-  await setInterfaceLanguage('fr')
-  render(<DatePicker selected={selected} onSelect={() => undefined} />)
-  expect(await openCalendar()).toHaveTextContent('fr')
 })

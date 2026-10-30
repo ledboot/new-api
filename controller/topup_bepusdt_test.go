@@ -94,7 +94,7 @@ func TestBepusdtCheckoutAndSettlementDatabaseMatrix(t *testing.T) {
 				t.Skip("set " + dialect.env + " to run this database")
 			}
 			db := modelManagementDB(t, dialect.kind, os.Getenv(dialect.env))
-			require.NoError(t, db.AutoMigrate(&model.TopUp{}, &model.Log{}))
+			require.NoError(t, db.AutoMigrate(&model.TopUp{}, &model.Log{}, &model.PaymentChannel{}, &model.PaymentChannelOrder{}))
 			bepusdtTestConfig(t)
 			user := model.User{Username: "bepusdt-buyer", Group: "default", Status: common.UserStatusEnabled}
 			require.NoError(t, db.Create(&user).Error)

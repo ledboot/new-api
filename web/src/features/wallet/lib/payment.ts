@@ -194,6 +194,15 @@ export function getMinTopupAmount(topupInfo: TopupInfo | null): number {
     return DEFAULT_MIN_TOPUP
   }
 
+  if (
+    topupInfo.pay_methods?.some((method) => method.type.startsWith('channel:'))
+  ) {
+    const minimums = topupInfo.pay_methods.map(
+      (method) => method.fixed_amount || method.min_topup || DEFAULT_MIN_TOPUP
+    )
+    return Math.min(...minimums)
+  }
+
   if (topupInfo.enable_online_topup) {
     return topupInfo.min_topup
   }

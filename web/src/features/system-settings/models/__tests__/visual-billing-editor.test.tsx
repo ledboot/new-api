@@ -36,12 +36,7 @@ const chainedExpression =
 
 test.each([
   ['zhCN', '星期一'],
-  ['zhTW', '星期一'],
   ['en', 'Monday'],
-  ['fr', 'lundi'],
-  ['ru', 'понедельник'],
-  ['ja', '月曜日'],
-  ['vi', 'Thứ Hai'],
   [
     'invalid_locale',
     new Intl.DateTimeFormat(undefined, {
@@ -57,7 +52,7 @@ test.each([
       lng: language,
       fallbackLng: 'en',
       resources: Object.fromEntries(
-        ['en', 'fr', language].map((code) => [
+        ['en', 'zhCN', language].map((code) => [
           code,
           { translation: { 'Condition value': 'Condition value' } },
         ])
@@ -76,10 +71,10 @@ test.each([
     expect(
       screen.getByRole('combobox', { name: 'Condition value' })
     ).toHaveTextContent(monday)
-    await act(() => translations.changeLanguage('fr'))
+    await act(() => translations.changeLanguage('en'))
     expect(
       screen.getByRole('combobox', { name: 'Condition value' })
-    ).toHaveTextContent('lundi')
+    ).toHaveTextContent('Monday')
     expect(onChange).not.toHaveBeenCalled()
   }
 )

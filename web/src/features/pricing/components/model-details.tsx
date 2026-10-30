@@ -60,6 +60,7 @@ import {
 } from '@/features/performance-metrics/lib/format'
 import type { PerformanceSummary } from '@/features/performance-metrics/types'
 import { PluginIcon } from '@/features/task-plugins/components/plugin-icon'
+import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
@@ -93,8 +94,12 @@ import {
 import { withPluginPricing } from '../lib/plugin-pricing'
 import {
   calculateTokenPrice,
+  formatDeltaPercent,
   formatFixedPrice,
   formatGroupPrice,
+  getOfficialPriceSummary,
+  getPriceComparison,
+  isOfficialDiscount,
 } from '../lib/price'
 import {
   evaluateTaskUsageExamples,
@@ -134,6 +139,64 @@ function SectionTitle(props: {
     >
       {props.children}
     </h2>
+  )
+}
+
+function OfficialReferencePrice(props: {
+  model: PricingModel
+  tokenUnit: TokenUnit
+}) {
+  const { t } = useTranslation()
+  const official = getOfficialPriceSummary(props.model)
+  if (!official) return null
+  const divisor = props.tokenUnit === 'K' ? 1000 : 1
+  const money = (usd: number) =>
+    formatBillingCurrencyFromUSD(usd / divisor, {
+      digitsLarge: 4,
+      digitsSmall: 4,
+      abbreviate: false,
+    })
+  const unitLabel = props.tokenUnit === 'K' ? '1K' : '1M'
+  let detail = `${money(official.input)} / ${t('request')}`
+  if (official.unit === 'token') {
+    const parts = [
+      `${t('Input')} ${money(official.input)} / ${unitLabel}`,
+      official.output
+        ? `${t('Output')} ${money(official.output)} / ${unitLabel}`
+        : '',
+      official.cacheRead
+        ? `${t('Cache read')} ${money(official.cacheRead)} / ${unitLabel}`
+        : '',
+      official.cacheWrite
+        ? `${t('Cache write (5m)')} ${money(official.cacheWrite)} / ${unitLabel}`
+        : '',
+      official.cacheWrite1h
+        ? `${t('Cache write (1h)')} ${money(official.cacheWrite1h)} / ${unitLabel}`
+        : '',
+    ].filter(Boolean)
+    detail = parts.join(' · ')
+  }
+  return (
+    <p className='bg-muted/40 text-muted-foreground mb-2 rounded-lg px-3 py-2 text-xs leading-5'>
+      {t('Official reference price')}: {detail}
+    </p>
+  )
+}
+
+function SavingsCell(props: { delta?: number }) {
+  const { t } = useTranslation()
+  if (!isOfficialDiscount(props.delta)) {
+    return <span className='text-muted-foreground/40'>—</span>
+  }
+  return (
+    <span
+      className='text-success font-medium'
+      title={t(
+        'Compared with the official list price, based on the input price.'
+      )}
+    >
+      -{formatDeltaPercent(props.delta)}%
+    </span>
   )
 }
 
@@ -1032,6 +1095,37 @@ function ProviderGroupPricingSection(
       })
     )
 
+    // Only savings are shown: a group priced at or above the official list
+    // price gets no comparison badge at all.
+    const officialSummary = getOfficialPriceSummary(props.model)
+    let targetField: 'fixedPrice' | 'inputPrice' | null = null
+    if (officialSummary) {
+      targetField =
+        officialSummary.unit === 'request' ? 'fixedPrice' : 'inputPrice'
+    }
+    const deltaByGroupTier = new Map<
+      string,
+      Map<DynamicPricingTier, number>
+    >()
+    if (officialSummary && targetField) {
+      for (const { group, tiers } of tierGroups) {
+        const ratio = getConfiguredGroupRatio(props.groupRatio, group)
+        const perTier = new Map<DynamicPricingTier, number>()
+        for (const tier of tiers) {
+          const entry = getDynamicPriceEntries(tier, {
+            tokenUnit: 'M',
+            groupRatioMultiplier: ratio,
+          }).find((item) => item.field === targetField)
+          const value = entry?.minValue ?? entry?.value
+          if (typeof value !== 'number' || value <= 0) continue
+          // Entries carry the raw tier price; the group ratio is applied when
+          // the cell is formatted, so include it in the comparison.
+          perTier.set(tier, (value * ratio) / officialSummary.input - 1)
+        }
+        if (perTier.size > 0) deltaByGroupTier.set(group, perTier)
+      }
+    }
+
     const columns: StaticDataTableColumn<GroupPricingRow>[] = [
       {
         id: 'group',
@@ -1114,6 +1208,15 @@ function ProviderGroupPricingSection(
               ?.get(fieldEntry.field) ?? '-',
         }
       }),
+      {
+        id: 'savings',
+        header: t('Savings'),
+        className: `${thClass} text-right`,
+        cellClassName: 'py-2.5 text-right font-mono',
+        cell: (row: GroupPricingRow) => (
+          <SavingsCell delta={deltaByGroupTier.get(row.group)?.get(row.tier)} />
+        ),
+      },
     ]
 
     return (
@@ -1127,6 +1230,10 @@ function ProviderGroupPricingSection(
           />
         )}
         <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
+        <OfficialReferencePrice
+          model={props.model}
+          tokenUnit={props.tokenUnit}
+        />
         <StaticDataTable
           className='rounded-lg'
           tableClassName='text-sm'
@@ -1257,6 +1364,7 @@ function ProviderGroupPricingSection(
         />
       )}
       <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
+      <OfficialReferencePrice model={props.model} tokenUnit={props.tokenUnit} />
       <StaticDataTable
         className='-mx-4 rounded-none border-0 sm:mx-0'
         tableClassName='text-sm'
@@ -1301,9 +1409,25 @@ function ProviderGroupPricingSection(
                   header: t('Price'),
                   className: `${thClass} text-right`,
                   cellClassName: 'py-2.5 text-right font-mono',
-                  cell: renderFixedGroupPrice,
+                  cell: (group: string) => renderFixedGroupPrice(group),
                 },
               ]),
+          {
+            id: 'savings',
+            header: t('Savings'),
+            className: `${thClass} text-right`,
+            cellClassName: 'py-2.5 text-right font-mono',
+            cell: (group: string) => (
+              <SavingsCell
+                delta={
+                  getPriceComparison(
+                    props.model,
+                    getConfiguredGroupRatio(props.groupRatio, group)
+                  )?.inputDelta
+                }
+              />
+            ),
+          },
         ]}
       />
     </section>

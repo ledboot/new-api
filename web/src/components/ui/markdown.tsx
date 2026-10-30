@@ -607,6 +607,51 @@ function renderSequenceDiagram(source: string): string {
 const markdownRenderer = new Renderer()
 const renderDefaultCode = markdownRenderer.code.bind(markdownRenderer)
 
+// Anchors let documentation pages link to a section (for example /docs#计费与收费模式)
+// without post-processing the sanitized HTML, which React rewrites on re-render.
+let usedHeadingIds = new Set<string>()
+
+function markdownHeadingId(text: string) {
+  return text
+    .replace(/<[^>]*>/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s/\\·、，,。.:：]+/g, '-')
+    .replace(/[^\p{L}\p{N}-]/gu, '')
+    .replace(/^-+|-+$/g, '')
+}
+
+// Explicit anchors (`## 项目简介 {#overview}`) keep deep links stable when the
+// heading text is translated; without one the id is derived from the text.
+const explicitHeadingAnchor = /\s*\{#([A-Za-z0-9_-]+)\}\s*$/
+
+markdownRenderer.heading = function (
+  this: Renderer,
+  token: Tokens.Heading
+): string {
+  let inner = this.parser.parseInline(token.tokens)
+  const depth = token.depth
+  let base = ''
+  const explicit = explicitHeadingAnchor.exec(inner)
+  if (explicit) {
+    base = explicit[1]
+    inner = inner.replace(explicitHeadingAnchor, '')
+  } else {
+    base = markdownHeadingId(token.text)
+  }
+  if (!base) {
+    return `<h${depth}>${inner}</h${depth}>`
+  }
+  let id = base
+  let suffix = 2
+  while (usedHeadingIds.has(id)) {
+    id = `${base}-${suffix}`
+    suffix += 1
+  }
+  usedHeadingIds.add(id)
+  return `<h${depth} id="${escapeHtml(id)}">${inner}</h${depth}>`
+}
+
 markdownRenderer.code = (token: Tokens.Code): string => {
   const language = token.lang?.toLowerCase()
 
@@ -753,6 +798,7 @@ function renderMarkdown(
   breaks = false,
   baseUrl?: string
 ): string {
+  usedHeadingIds = new Set<string>()
   const parsedHtml = markdownParser.parse(markdown, {
     ...markdownOptions,
     breaks,

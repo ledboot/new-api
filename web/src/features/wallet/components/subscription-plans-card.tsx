@@ -76,7 +76,8 @@ function getEpayMethods(payMethods: PaymentMethod[] = []): PaymentMethod[] {
       m?.type &&
       m.type !== 'stripe' &&
       m.type !== 'creem' &&
-      m.type !== 'bepusdt'
+      m.type !== 'bepusdt' &&
+      !m.type.startsWith('channel:')
   )
 }
 
@@ -126,8 +127,11 @@ export function SubscriptionPlansCard({
   const enableWaffoPancake = !!topupInfo?.enable_waffo_pancake_topup
   const enableOnlineTopUp = !!topupInfo?.enable_online_topup
   const epayMethods = useMemo(
-    () => getEpayMethods(topupInfo?.pay_methods),
-    [topupInfo?.pay_methods]
+    () =>
+      getEpayMethods(
+        topupInfo?.subscription_pay_methods ?? topupInfo?.pay_methods
+      ),
+    [topupInfo?.pay_methods, topupInfo?.subscription_pay_methods]
   )
 
   const fetchPlans = useCallback(async () => {

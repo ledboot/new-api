@@ -191,10 +191,7 @@ it.each([
   }
 )
 
-it.each([
-  { language: 'zhCN', locale: 'zh-CN' },
-  { language: 'zhTW', locale: 'zh-TW' },
-])(
+it.each([{ language: 'zhCN', locale: 'zh-CN' }])(
   'formats status numbers and timestamps for $language',
   async ({ language, locale }) => {
     const i18n = createInstance()

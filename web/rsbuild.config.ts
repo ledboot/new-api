@@ -89,6 +89,11 @@ export default defineConfig(({ envMode }) => {
     },
     tools: {
       rspack: {
+        // `?raw` imports are used by the documentation page to render a plain
+        // Markdown file; Rsbuild 2 no longer resolves them on its own.
+        module: {
+          rules: [{ resourceQuery: /raw/, type: 'asset/source' }],
+        },
         plugins: [
           tanstackRouter({
             target: 'react',

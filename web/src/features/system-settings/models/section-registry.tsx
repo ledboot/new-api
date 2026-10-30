@@ -23,6 +23,7 @@ import { ClaudeSettingsCard } from './claude-settings-card'
 import { GeminiSettingsCard } from './gemini-settings-card'
 import { GlobalSettingsCard } from './global-settings-card'
 import { GrokSettingsCard } from './grok-settings-card'
+import { OfficialPriceSettingsCard } from './official-price-settings-card'
 
 function formatJsonForEditor(value: string, fallback: string) {
   const raw = (value ?? '').toString().trim()
@@ -121,6 +122,21 @@ const MODELS_SECTIONS = [
     ),
   },
 
+  {
+    id: 'official-price',
+    titleKey: 'Official reference price',
+    build: (settings: ModelSettings) => (
+      <OfficialPriceSettingsCard
+        defaultValues={{
+          enabled: settings['official_price_setting.enabled'] ?? true,
+          intervalHours: settings['official_price_setting.interval_hours'] ?? 24,
+          sourceUrl:
+            settings['official_price_setting.source_url'] ||
+            'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json',
+        }}
+      />
+    ),
+  },
   {
     id: 'model-deployment',
     titleKey: 'Model Deployment',

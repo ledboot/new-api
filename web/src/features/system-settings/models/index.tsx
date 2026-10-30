@@ -66,6 +66,10 @@ const defaultModelSettings: ModelSettings = {
   'group_ratio_setting.group_special_usable_group': '{}',
   'model_deployment.ionet.api_key': '',
   'model_deployment.ionet.enabled': false,
+  'official_price_setting.enabled': true,
+  'official_price_setting.interval_hours': 24,
+  'official_price_setting.source_url':
+    'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json',
 }
 
 export function ModelSettings() {

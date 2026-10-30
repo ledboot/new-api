@@ -274,3 +274,125 @@ export function formatRequestPrice(
     abbreviate: false,
   })
 }
+
+// ----------------------------------------------------------------------------
+// Official price comparison
+// ----------------------------------------------------------------------------
+
+export type PriceComparison = {
+  /** Fractional change against the official list price; negative means cheaper. */
+  inputDelta: number
+  outputDelta?: number
+  officialInput: number
+  ourInput: number
+  officialOutput?: number
+  ourOutput?: number
+}
+
+/** Price unit of the official baseline: per 1M tokens or per request. */
+export type OfficialPriceSummary = {
+  unit: 'token' | 'request'
+  input: number
+  output?: number
+  cacheRead?: number
+  cacheWrite?: number
+  cacheWrite1h?: number
+}
+
+function positive(value: number | null | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : undefined
+}
+
+/**
+ * Vendor list price (USD per 1M tokens, or per request) as resolved by the
+ * backend: an administrator override or a synchronised price source wins over
+ * the built-in default ratios.
+ *
+ * Returns null for models without a baseline — custom, renamed or task-plugin
+ * models have no vendor list price to compare against.
+ */
+export function getOfficialPriceSummary(
+  model: PricingModel
+): OfficialPriceSummary | null {
+  const requestPrice = positive(model.official_request_price)
+  if (requestPrice) {
+    return { unit: 'request', input: requestPrice }
+  }
+  const input = positive(model.official_input_price)
+  if (!input) return null
+  return {
+    unit: 'token',
+    input,
+    output: positive(model.official_output_price),
+    cacheRead: positive(model.official_cache_read_price),
+    cacheWrite: positive(model.official_cache_write_price),
+    cacheWrite1h: positive(model.official_cache_write_1h_price),
+  }
+}
+
+/**
+ * Compare the site price at the given group ratio with the vendor list price.
+ * Negative deltas mean the site is cheaper; null when there is no baseline.
+ */
+export function getPriceComparison(
+  model: PricingModel,
+  groupRatio: number
+): PriceComparison | null {
+  if (!Number.isFinite(groupRatio) || groupRatio <= 0) return null
+  const official = getOfficialPriceSummary(model)
+  if (!official) return null
+
+  if (official.unit === 'request') {
+    const ourPrice = positive(model.model_price)
+    if (!ourPrice) return null
+    const ours = ourPrice * groupRatio
+    return {
+      officialInput: official.input,
+      ourInput: ours,
+      inputDelta: ours / official.input - 1,
+    }
+  }
+
+  const ourRatio = positive(model.model_ratio)
+  if (!ourRatio) return null
+  const ourInput = ourRatio * 2 * groupRatio
+  const inputDelta = ourInput / official.input - 1
+  if (!official.output) {
+    return { officialInput: official.input, ourInput, inputDelta }
+  }
+  const ourOutput = ourInput * (model.completion_ratio || 1)
+  return {
+    officialInput: official.input,
+    ourInput,
+    inputDelta,
+    officialOutput: official.output,
+    ourOutput,
+    outputDelta: ourOutput / official.output - 1,
+  }
+}
+
+/** Human-readable magnitude of a delta, e.g. 0.2 -> "20", 0.125 -> "12.5". */
+export function formatDeltaPercent(delta: number): string {
+  const percent = Math.abs(delta) * 100
+  // One decimal at most, without a trailing ".0" (20 → "20", 12.5 → "12.5").
+  return String(Math.round(percent * 10) / 10)
+}
+
+/** Prices within this band are treated as matching the official price. */
+export const OFFICIAL_PRICE_TOLERANCE = 0.005
+
+/**
+ * Only real savings are worth showing. Anything at or above the official list
+ * price is hidden instead of advertising a markup.
+ */
+export function isOfficialDiscount(
+  delta: number | undefined
+): delta is number {
+  return (
+    typeof delta === 'number' &&
+    Number.isFinite(delta) &&
+    delta <= -OFFICIAL_PRICE_TOLERANCE
+  )
+}

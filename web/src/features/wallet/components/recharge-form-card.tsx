@@ -133,11 +133,13 @@ export function RechargeFormCard({
   }
 
   const hasConfigurableTopup =
-    topupInfo?.enable_bepusdt_topup ||
-    topupInfo?.enable_online_topup ||
-    topupInfo?.enable_stripe_topup ||
-    enableWaffoTopup ||
-    enableWaffoPancakeTopup
+    topupInfo?.wallet_payment_methods_available ??
+    ((topupInfo?.pay_methods?.length ?? 0) > 0 ||
+      topupInfo?.enable_bepusdt_topup ||
+      topupInfo?.enable_online_topup ||
+      topupInfo?.enable_stripe_topup ||
+      enableWaffoTopup ||
+      enableWaffoPancakeTopup)
   const hasAnyTopup = hasConfigurableTopup || enableCreemTopup
   const hasStandardPaymentMethods =
     Array.isArray(topupInfo?.pay_methods) && topupInfo.pay_methods.length > 0
@@ -339,11 +341,14 @@ export function RechargeFormCard({
                 {hasStandardPaymentMethods ? (
                   <div className='grid grid-cols-2 gap-1.5 sm:gap-3 lg:grid-cols-3'>
                     {topupInfo?.pay_methods?.map((method) => {
-                      const minTopup = Math.max(
-                        method.min_topup || 0,
-                        getMinTopupAmount(topupInfo)
-                      )
-                      const disabled = minTopup > topupAmount
+                      const minTopup = method.type.startsWith('channel:')
+                        ? method.min_topup || 0
+                        : Math.max(
+                            method.min_topup || 0,
+                            getMinTopupAmount(topupInfo)
+                          )
+                      const disabled =
+                        !method.fixed_amount && minTopup > topupAmount
                       const disabledReason = disabled
                         ? t('Minimum topup amount: {{amount}}', {
                             amount: minTopup,
@@ -381,6 +386,11 @@ export function RechargeFormCard({
                             <span className='max-w-full truncate'>
                               {method.name}
                             </span>
+                            {method.channel_name && (
+                              <span className='text-muted-foreground max-w-full truncate text-[11px]'>
+                                {method.channel_name}
+                              </span>
+                            )}
                             {disabledLabel && (
                               <span className='text-muted-foreground max-w-full truncate text-[11px] leading-4 font-normal'>
                                 {disabledLabel}

@@ -20,9 +20,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// The web console saves its own language codes (zhCN, zhTW, fr, ...) in the
-// user setting; backend messages must follow them, and languages without a
-// backend locale fall back to English.
+// The web console saves its own language codes (zhCN, en) in the user setting;
+// backend messages must follow them, and languages without a backend locale
+// fall back to English.
 func TestLanguageFromUserSetting(t *testing.T) {
 	require.NoError(t, Init())
 	for _, tc := range []struct {
@@ -30,11 +30,11 @@ func TestLanguageFromUserSetting(t *testing.T) {
 		want  string
 	}{
 		{"zhCN", LangZhCN},
-		{"zhTW", LangZhTW},
-		{"zh-HK", LangZhTW},
-		{"zh_TW", LangZhTW},
-		{"zh_HK", LangZhTW},
-		{"zh-Hant-TW", LangZhTW},
+		{"zhTW", LangZhCN},
+		{"zh-HK", LangZhCN},
+		{"zh_TW", LangZhCN},
+		{"zh_HK", LangZhCN},
+		{"zh-Hant-TW", LangZhCN},
 		{"zh", LangZhCN},
 		{"en", LangEn},
 		{"fr", LangEn},
@@ -56,7 +56,7 @@ func TestStatedLangLoadsTheUserOnlyWithoutLoadedSettings(t *testing.T) {
 	loads := 0
 	SetUserLangLoader(func(int) string {
 		loads++
-		return "zhTW"
+		return "zhCN"
 	})
 
 	relay, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -69,7 +69,7 @@ func TestStatedLangLoadsTheUserOnlyWithoutLoadedSettings(t *testing.T) {
 	dashboard, _ := gin.CreateTestContext(httptest.NewRecorder())
 	dashboard.Request = httptest.NewRequest("GET", "/api/user/self", nil)
 	dashboard.Set("id", 7)
-	assert.Equal(t, LangZhTW, StatedLang(dashboard))
+	assert.Equal(t, LangZhCN, StatedLang(dashboard))
 	assert.Equal(t, 1, loads)
 }
 
@@ -95,7 +95,7 @@ func TestBackendMessageLanguage(t *testing.T) {
 		{"nothing stated with an English default", "en", "", "", english},
 		{"header wins over the default", "zh-CN", "", "en-US,en;q=0.9", english},
 		{"header in a language without a locale", "zh-CN", "", "fr-FR", english},
-		{"saved language wins over the header", "", "zhTW", "en-US", "使用者額度不足，剩餘額度：$0.10"},
+		{"saved language wins over the header", "", "zhCN", "en-US", "用户额度不足, 剩余额度: $0.10"},
 		{"saved language", "zh-CN", "en", "", english},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

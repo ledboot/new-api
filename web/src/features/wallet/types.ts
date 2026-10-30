@@ -90,6 +90,12 @@ export interface CreemPaymentRequest {
  * Payment method configuration
  */
 export interface PaymentMethod {
+  provider?: string
+  channel_name?: string
+  currency?: string
+  interaction?: string
+  fixed_amount?: number
+  unit_price?: number
   /** Display name of payment method */
   name: string
   /** Payment method type identifier */
@@ -120,12 +126,14 @@ export interface WaffoPayMethod {
  * Topup configuration information
  */
 export interface TopupInfo {
+  wallet_payment_methods_available?: boolean
   /** Whether online topup is enabled */
   enable_online_topup: boolean
   /** Whether Stripe topup is enabled */
   enable_stripe_topup: boolean
   /** Available payment methods */
   pay_methods: PaymentMethod[]
+  subscription_pay_methods?: PaymentMethod[]
   /** Minimum topup amount for online topup */
   min_topup: number
   /** Minimum topup amount for Stripe */
@@ -256,6 +264,9 @@ export type TopupStatus = 'success' | 'pending' | 'expired'
  * Topup billing record
  */
 export interface TopupRecord {
+  wallet_amount?: string
+  payment_currency?: string
+  payment_name?: string
   /** Record ID */
   id: number
   /** User ID */

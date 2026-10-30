@@ -25,31 +25,41 @@ type PricingPluginVariant struct {
 }
 
 type Pricing struct {
-	GroupInputTokenLimits  map[string]int64                     `json:"group_input_token_limits,omitempty"`
-	GroupBillingExpr       map[string]string                    `json:"group_billing_expr,omitempty"`
-	BillingPluginVariants  []PricingPluginVariant               `json:"billing_plugin_variants,omitempty"`
-	ModelName              string                               `json:"model_name"`
-	Description            string                               `json:"description,omitempty"`
-	Icon                   string                               `json:"icon,omitempty"`
-	Tags                   string                               `json:"tags,omitempty"`
-	VendorID               int                                  `json:"vendor_id,omitempty"`
-	QuotaType              int                                  `json:"quota_type"`
-	ModelRatio             float64                              `json:"model_ratio"`
-	ModelPrice             float64                              `json:"model_price"`
-	OwnerBy                string                               `json:"owner_by"`
-	CompletionRatio        float64                              `json:"completion_ratio"`
-	CacheRatio             *float64                             `json:"cache_ratio,omitempty"`
-	CreateCacheRatio       *float64                             `json:"create_cache_ratio,omitempty"`
-	ImageRatio             *float64                             `json:"image_ratio,omitempty"`
-	AudioRatio             *float64                             `json:"audio_ratio,omitempty"`
-	AudioCompletionRatio   *float64                             `json:"audio_completion_ratio,omitempty"`
-	EnableGroup            []string                             `json:"enable_groups"`
-	SupportedEndpointTypes []constant.EndpointType              `json:"supported_endpoint_types"`
-	BillingMode            string                               `json:"billing_mode,omitempty"`
-	BillingExpr            string                               `json:"billing_expr,omitempty"`
-	BillingUsageSchema     map[string]jsplugin.UsageFieldSchema `json:"billing_usage_schema,omitempty"`
-	BillingUsageExamples   []jsplugin.UsageExample              `json:"billing_usage_examples,omitempty"`
-	PricingVersion         string                               `json:"pricing_version,omitempty"`
+	GroupInputTokenLimits map[string]int64       `json:"group_input_token_limits,omitempty"`
+	GroupBillingExpr      map[string]string      `json:"group_billing_expr,omitempty"`
+	BillingPluginVariants []PricingPluginVariant `json:"billing_plugin_variants,omitempty"`
+	ModelName             string                 `json:"model_name"`
+	Description           string                 `json:"description,omitempty"`
+	Icon                  string                 `json:"icon,omitempty"`
+	Tags                  string                 `json:"tags,omitempty"`
+	VendorID              int                    `json:"vendor_id,omitempty"`
+	QuotaType             int                    `json:"quota_type"`
+	ModelRatio            float64                `json:"model_ratio"`
+	ModelPrice            float64                `json:"model_price"`
+	// Vendor list price used only for the "vs official" hint in the model
+	// square. Administrators can override it, or it comes from the built-in
+	// default ratios (ratio 1.0 = $2 / 1M tokens).
+	OfficialInputPrice        float64                              `json:"official_input_price,omitempty"`
+	OfficialOutputPrice       float64                              `json:"official_output_price,omitempty"`
+	OfficialRequestPrice      float64                              `json:"official_request_price,omitempty"`
+	OfficialCacheReadPrice    float64                              `json:"official_cache_read_price,omitempty"`
+	OfficialCacheWritePrice   float64                              `json:"official_cache_write_price,omitempty"`
+	OfficialCacheWrite1hPrice float64                              `json:"official_cache_write_1h_price,omitempty"`
+	OfficialPriceSource       string                               `json:"official_price_source,omitempty"`
+	OwnerBy                   string                               `json:"owner_by"`
+	CompletionRatio           float64                              `json:"completion_ratio"`
+	CacheRatio                *float64                             `json:"cache_ratio,omitempty"`
+	CreateCacheRatio          *float64                             `json:"create_cache_ratio,omitempty"`
+	ImageRatio                *float64                             `json:"image_ratio,omitempty"`
+	AudioRatio                *float64                             `json:"audio_ratio,omitempty"`
+	AudioCompletionRatio      *float64                             `json:"audio_completion_ratio,omitempty"`
+	EnableGroup               []string                             `json:"enable_groups"`
+	SupportedEndpointTypes    []constant.EndpointType              `json:"supported_endpoint_types"`
+	BillingMode               string                               `json:"billing_mode,omitempty"`
+	BillingExpr               string                               `json:"billing_expr,omitempty"`
+	BillingUsageSchema        map[string]jsplugin.UsageFieldSchema `json:"billing_usage_schema,omitempty"`
+	BillingUsageExamples      []jsplugin.UsageExample              `json:"billing_usage_examples,omitempty"`
+	PricingVersion            string                               `json:"pricing_version,omitempty"`
 }
 
 type PricingVendor struct {
@@ -325,6 +335,12 @@ func updatePricing() {
 		}
 	}
 
+	officialPrices, err := GetOfficialPriceMap()
+	if err != nil {
+		common.SysLog(common.LogText("load official prices error: %v", err))
+		officialPrices = map[string]OfficialPrice{}
+	}
+
 	pricingMap = make([]Pricing, 0)
 	pluginGeneration := jsplugin.DefaultRegistry.Generation()
 	for model, groups := range modelGroupsMap {
@@ -357,6 +373,7 @@ func updatePricing() {
 			pricing.CompletionRatio = ratio_setting.GetCompletionRatio(model)
 			pricing.QuotaType = 0
 		}
+		applyOfficialPrice(&pricing, model, officialPrices[model])
 		if cacheRatio, ok := ratio_setting.GetCacheRatio(model); ok {
 			pricing.CacheRatio = &cacheRatio
 		}
@@ -453,4 +470,45 @@ func updatePricing() {
 // GetSupportedEndpointMap 返回全局端点到路径的映射
 func GetSupportedEndpointMap() map[string]common.EndpointInfo {
 	return supportedEndpointMap
+}
+
+// applyOfficialPrice fills the official baseline for one model: an explicit
+// override (manual edit or sync) wins over the built-in default ratios.
+func applyOfficialPrice(pricing *Pricing, modelName string, override OfficialPrice) {
+	if override.ModelName != "" {
+		pricing.OfficialInputPrice = override.InputPrice
+		pricing.OfficialOutputPrice = override.OutputPrice
+		pricing.OfficialRequestPrice = override.RequestPrice
+		pricing.OfficialCacheReadPrice = override.CacheReadPrice
+		pricing.OfficialCacheWritePrice = override.CacheWritePrice
+		pricing.OfficialCacheWrite1hPrice = override.CacheWrite1hPrice
+		pricing.OfficialPriceSource = override.Source
+		return
+	}
+	if pricing.QuotaType == 1 {
+		if price, ok := ratio_setting.GetDefaultModelPriceMap()[modelName]; ok && price > 0 {
+			pricing.OfficialRequestPrice = price
+			pricing.OfficialPriceSource = OfficialPriceSourceDefault
+		}
+		return
+	}
+	officialRatio, ok := ratio_setting.GetDefaultModelRatioMap()[modelName]
+	if !ok || officialRatio <= 0 {
+		return
+	}
+	input := officialRatio * 2
+	completion := pricing.CompletionRatio
+	if officialCompletion, exists := ratio_setting.GetDefaultCompletionRatioMap()[modelName]; exists && officialCompletion > 0 {
+		completion = officialCompletion
+	}
+	pricing.OfficialInputPrice = input
+	pricing.OfficialOutputPrice = input * completion
+	// Cache defaults are vendor-side ratios, not the site's configured ones.
+	if cacheRatio, ok := ratio_setting.GetDefaultCacheRatioMap()[modelName]; ok && cacheRatio > 0 {
+		pricing.OfficialCacheReadPrice = input * cacheRatio
+	}
+	if createCacheRatio, ok := ratio_setting.GetDefaultCreateCacheRatioMap()[modelName]; ok && createCacheRatio > 0 {
+		pricing.OfficialCacheWritePrice = input * createCacheRatio
+	}
+	pricing.OfficialPriceSource = OfficialPriceSourceDefault
 }

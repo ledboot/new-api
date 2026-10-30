@@ -64,6 +64,7 @@ import { safeNumberFieldProps } from '../utils/numeric-field'
 import { AmountDiscountVisualEditor } from './amount-discount-visual-editor'
 import { AmountOptionsVisualEditor } from './amount-options-visual-editor'
 import { CreemProductsVisualEditor } from './creem-products-visual-editor'
+import { PaymentChannels } from './payment-channels'
 import { PaymentMethodsVisualEditor } from './payment-methods-visual-editor'
 import {
   formatJsonForEditor,
@@ -251,6 +252,7 @@ export function PaymentSettingsSection({
     [initialFormValues]
   )
 
+  const [legacyOpen, setLegacyOpen] = React.useState(false)
   const [payMethodsVisualMode, setPayMethodsVisualMode] = React.useState(true)
   const [amountOptionsVisualMode, setAmountOptionsVisualMode] =
     React.useState(true)
@@ -903,603 +905,285 @@ export function PaymentSettingsSection({
         onConfirm={() => confirmComplianceMutation.mutate()}
       />
 
-      <Form {...form}>
-        <SettingsForm
-          onSubmit={form.handleSubmit(onSubmit)}
-          className={cn(
-            'gap-y-8',
-            !complianceConfirmed && 'pointer-events-none opacity-40'
+      <PaymentChannels enabled={complianceConfirmed} />
+      <details
+        open={legacyOpen}
+        onToggle={(event) => setLegacyOpen(event.currentTarget.open)}
+        className='mt-6 min-w-0 rounded-lg border p-4'
+      >
+        <summary className='cursor-pointer font-medium'>
+          {t('Legacy gateways, subscriptions and shared recharge settings')}
+        </summary>
+        <p className='text-muted-foreground my-4 text-sm'>
+          {t(
+            'Manage wallet payment entries above. Legacy settings remain available for existing subscriptions, Waffo and shared recharge options.'
           )}
-          data-no-autosubmit='true'
-        >
-          <SettingsPageFormActions
-            onSave={form.handleSubmit(onSubmit)}
-            isSaving={updateOption.isPending || isSubmitting}
-            saveLabel='Save all settings'
-          />
-          <Tabs defaultValue='general' className='min-w-0'>
-            <div className='overflow-x-auto pb-1'>
-              <TabsList className='grid min-w-[50rem] grid-cols-7'>
-                <TabsTrigger value='general'>{t('General')}</TabsTrigger>
-                <TabsTrigger value='epay'>Epay</TabsTrigger>
-                <TabsTrigger value='bepusdt'>BEpusdt</TabsTrigger>
-                <TabsTrigger value='stripe'>{t('Stripe')}</TabsTrigger>
-                <TabsTrigger value='creem'>Creem</TabsTrigger>
-                <TabsTrigger value='waffo-pancake'>Waffo Pancake</TabsTrigger>
-                <TabsTrigger value='waffo'>Waffo</TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent value='bepusdt' className={paymentTabContentClassName}>
-              <div className='space-y-6'>
-                <p className='text-muted-foreground text-sm'>
-                  {t(
-                    'BEpusdt orders are charged in USD. The gateway converts the amount to the selected cryptocurrency.'
-                  )}
-                </p>
-                <div className='grid gap-6 md:grid-cols-2'>
-                  <FormField
-                    control={form.control}
-                    name='BepusdtApiURL'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Gateway URL')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder='https://pay.example.com'
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name='BepusdtApiToken'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('API Token')}</FormLabel>
-                        <FormControl>
-                          <PasswordInput
-                            {...field}
-                            autoComplete='new-password'
-                            placeholder={t(
-                              'Leave blank to keep the current token'
-                            )}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name='BepusdtTradeType'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Payment network')}</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder='usdt.trc20' />
-                        </FormControl>
-                        <FormDescription>
-                          {t(
-                            'Use a BEpusdt trade type, such as usdt.trc20 or usdt.erc20.'
-                          )}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name='BepusdtUnitPrice'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {t('USD charged per USD of balance')}
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type='number'
-                            min={0.01}
-                            step='0.01'
-                            {...safeNumberFieldProps(field)}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t(
-                            'Top-up group ratios and preset discounts also apply.'
-                          )}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name='BepusdtMinTopUp'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Minimum Topup')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type='number'
-                            min={1}
-                            step='1'
-                            {...safeNumberFieldProps(field)}
-                          />
-                        </FormControl>
-                        <FormDescription>USD</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <p className='text-muted-foreground text-sm'>
-                  {t(
-                    'Payment notifications are sent automatically to /api/bepusdt/notify on the configured callback domain.'
-                  )}
-                </p>
+        </p>
+        <Form {...form}>
+          <SettingsForm
+            onSubmit={form.handleSubmit(onSubmit)}
+            className={cn(
+              'gap-y-8',
+              !complianceConfirmed && 'pointer-events-none opacity-40'
+            )}
+            data-no-autosubmit='true'
+          >
+            {legacyOpen && (
+              <SettingsPageFormActions
+                onSave={form.handleSubmit(onSubmit)}
+                isSaving={updateOption.isPending || isSubmitting}
+                saveLabel='Save all settings'
+              />
+            )}
+            <Tabs defaultValue='general' className='min-w-0'>
+              <div className='overflow-x-auto pb-1'>
+                <TabsList className='grid min-w-[50rem] grid-cols-7'>
+                  <TabsTrigger value='general'>{t('General')}</TabsTrigger>
+                  <TabsTrigger value='epay'>Epay</TabsTrigger>
+                  <TabsTrigger value='bepusdt'>BEpusdt</TabsTrigger>
+                  <TabsTrigger value='stripe'>{t('Stripe')}</TabsTrigger>
+                  <TabsTrigger value='creem'>Creem</TabsTrigger>
+                  <TabsTrigger value='waffo-pancake'>Waffo Pancake</TabsTrigger>
+                  <TabsTrigger value='waffo'>Waffo</TabsTrigger>
+                </TabsList>
               </div>
-            </TabsContent>
 
-            <TabsContent value='general' className={paymentTabContentClassName}>
-              <div className='space-y-4'>
-                <div>
-                  <h3 className='text-lg font-medium'>
-                    {t('General Settings')}
-                  </h3>
+              <TabsContent
+                value='bepusdt'
+                className={paymentTabContentClassName}
+              >
+                <div className='space-y-6'>
                   <p className='text-muted-foreground text-sm'>
-                    {t('Shared configuration for all payment gateways')}
-                  </p>
-                </div>
-
-                <div className='grid gap-6 md:grid-cols-2'>
-                  <FormField
-                    control={form.control}
-                    name='Price'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {t('Price (local currency / USD)')}
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type='number'
-                            step='0.01'
-                            min={0}
-                            {...safeNumberFieldProps(field)}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t(
-                            'How much to charge for each US dollar of balance (Epay)'
-                          )}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name='MinTopUp'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Minimum top-up (USD)')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type='number'
-                            step='0.01'
-                            min={0}
-                            {...safeNumberFieldProps(field)}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t('Smallest USD amount users can recharge (Epay)')}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name='PayMethods'
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className='mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                        <FormLabel>{t('Payment methods')}</FormLabel>
-                        <Button
-                          type='button'
-                          variant='outline'
-                          size='sm'
-                          onClick={() =>
-                            setPayMethodsVisualMode(!payMethodsVisualMode)
-                          }
-                          className='w-full sm:w-auto'
-                        >
-                          {payMethodsVisualMode ? (
-                            <>
-                              <Code2 className='mr-2 h-3 w-3' />
-                              {t('JSON Editor')}
-                            </>
-                          ) : (
-                            <>
-                              <Eye className='mr-2 h-3 w-3' />
-                              {t('Visual Editor')}
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                      <FormControl>
-                        {payMethodsVisualMode ? (
-                          <PaymentMethodsVisualEditor
-                            value={field.value}
-                            onChange={field.onChange}
-                          />
-                        ) : (
-                          <JsonCodeEditor
-                            value={field.value}
-                            onChange={field.onChange}
-                            name={field.name}
-                            onBlur={field.onBlur}
-                            textareaRef={field.ref}
-                            placeholder={t(
-                              '[{"name":"支付宝","type":"alipay","icon":"SiAlipay"}]'
-                            )}
-                            heightClassName='h-40 min-h-40 max-h-40'
-                            aria-invalid={Boolean(
-                              form.formState.errors.PayMethods
-                            )}
-                          />
-                        )}
-                      </FormControl>
-                      <FormDescription>
-                        {t(
-                          'Configured as PayMethods JSON. The type value decides which payment flow is used: stripe for Stripe, waffo_pancake for Waffo Pancake, and other values are sent to Epay as the type parameter.'
-                        )}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className='grid gap-6 md:grid-cols-2 md:items-start'>
-                  <FormField
-                    control={form.control}
-                    name='AmountOptions'
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className='mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                          <FormLabel>{t('Top-up amount options')}</FormLabel>
-                          <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={() =>
-                              setAmountOptionsVisualMode(
-                                !amountOptionsVisualMode
-                              )
-                            }
-                            className='w-full sm:w-auto'
-                          >
-                            {amountOptionsVisualMode ? (
-                              <>
-                                <Code2 className='mr-2 h-3 w-3' />
-                                {t('JSON Editor')}
-                              </>
-                            ) : (
-                              <>
-                                <Eye className='mr-2 h-3 w-3' />
-                                {t('Visual Editor')}
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                        <FormControl>
-                          {amountOptionsVisualMode ? (
-                            <AmountOptionsVisualEditor
-                              value={field.value}
-                              onChange={field.onChange}
-                            />
-                          ) : (
-                            <JsonCodeEditor
-                              value={field.value}
-                              onChange={field.onChange}
-                              name={field.name}
-                              onBlur={field.onBlur}
-                              textareaRef={field.ref}
-                              placeholder='[10, 20, 50, 100]'
-                              heightClassName='h-40 min-h-40 max-h-40'
-                              aria-invalid={Boolean(
-                                form.formState.errors.AmountOptions
-                              )}
-                            />
-                          )}
-                        </FormControl>
-                        <FormDescription>
-                          {t('Preset recharge amounts (JSON array)')}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name='AmountDiscount'
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className='mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                          <FormLabel>{t('Amount discount')}</FormLabel>
-                          <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={() =>
-                              setAmountDiscountVisualMode(
-                                !amountDiscountVisualMode
-                              )
-                            }
-                            className='w-full sm:w-auto'
-                          >
-                            {amountDiscountVisualMode ? (
-                              <>
-                                <Code2 className='mr-2 h-3 w-3' />
-                                {t('JSON Editor')}
-                              </>
-                            ) : (
-                              <>
-                                <Eye className='mr-2 h-3 w-3' />
-                                {t('Visual Editor')}
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                        <FormControl>
-                          {amountDiscountVisualMode ? (
-                            <AmountDiscountVisualEditor
-                              value={field.value}
-                              onChange={field.onChange}
-                            />
-                          ) : (
-                            <JsonCodeEditor
-                              value={field.value}
-                              onChange={field.onChange}
-                              name={field.name}
-                              onBlur={field.onBlur}
-                              textareaRef={field.ref}
-                              placeholder='{"100":0.95,"200":0.9}'
-                              heightClassName='h-40 min-h-40 max-h-40'
-                              aria-invalid={Boolean(
-                                form.formState.errors.AmountDiscount
-                              )}
-                            />
-                          )}
-                        </FormControl>
-                        <FormDescription>
-                          {t('Discount map by recharge amount (JSON object)')}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value='epay' className={paymentTabContentClassName}>
-              <div className='space-y-4'>
-                <div>
-                  <h3 className='text-lg font-medium'>{t('Epay Gateway')}</h3>
-                  <p className='text-muted-foreground text-sm'>
-                    {t('Configuration for Epay payment integration')}
-                  </p>
-                </div>
-
-                <Alert>
-                  <ShieldAlert className='h-4 w-4' />
-                  <AlertTitle>{t('Epay safety reminder')}</AlertTitle>
-                  <AlertDescription>
                     {t(
-                      'Epay is a payment protocol, not a specific official website. Verify the provider yourself and do not trust random third-party Epay deployments.'
+                      'BEpusdt orders are charged in USD. The gateway converts the amount to the selected cryptocurrency.'
                     )}
-                  </AlertDescription>
-                </Alert>
-
-                <div className='grid gap-6 md:grid-cols-2'>
-                  <FormField
-                    control={form.control}
-                    name='PayAddress'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Epay endpoint')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder={t('https://pay.example.com')}
-                            {...field}
-                            onChange={(event) =>
-                              field.onChange(event.target.value)
-                            }
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t('Base address provided by your Epay service')}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name='CustomCallbackAddress'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Callback address')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder={t('https://gateway.example.com')}
-                            {...field}
-                            onChange={(event) =>
-                              field.onChange(event.target.value)
-                            }
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t(
-                            'Only enter the site origin, for example https://api.example.com. Do not include any path such as /api/user/epay/notify. Leave blank to use the server address.'
-                          )}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className='grid gap-6 md:grid-cols-2'>
-                  <FormField
-                    control={form.control}
-                    name='EpayId'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Epay merchant ID')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder='10001'
-                            autoComplete='off'
-                            {...field}
-                            onChange={(event) =>
-                              field.onChange(event.target.value)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name='EpayKey'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Epay secret key')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type='password'
-                            placeholder={t('Enter new key to update')}
-                            autoComplete='new-password'
-                            {...field}
-                            onChange={(event) =>
-                              field.onChange(event.target.value)
-                            }
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t('Leave blank unless rotating the secret')}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value='stripe' className={paymentTabContentClassName}>
-              <div className='space-y-4'>
-                <div>
-                  <h3 className='text-lg font-medium'>{t('Stripe Gateway')}</h3>
+                  </p>
+                  <div className='grid gap-6 md:grid-cols-2'>
+                    <FormField
+                      control={form.control}
+                      name='BepusdtApiURL'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Gateway URL')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder='https://pay.example.com'
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name='BepusdtApiToken'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('API Token')}</FormLabel>
+                          <FormControl>
+                            <PasswordInput
+                              {...field}
+                              autoComplete='new-password'
+                              placeholder={t(
+                                'Leave blank to keep the current token'
+                              )}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name='BepusdtTradeType'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Payment network')}</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder='usdt.trc20' />
+                          </FormControl>
+                          <FormDescription>
+                            {t(
+                              'Use a BEpusdt trade type, such as usdt.trc20 or usdt.erc20.'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name='BepusdtUnitPrice'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {t('USD charged per USD of balance')}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type='number'
+                              min={0.01}
+                              step='0.01'
+                              {...safeNumberFieldProps(field)}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t(
+                              'Top-up group ratios and preset discounts also apply.'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name='BepusdtMinTopUp'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Minimum Topup')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type='number'
+                              min={1}
+                              step='1'
+                              {...safeNumberFieldProps(field)}
+                            />
+                          </FormControl>
+                          <FormDescription>USD</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <p className='text-muted-foreground text-sm'>
-                    {t('Configuration for Stripe payment integration')}
-                  </p>
-                </div>
-
-                <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
-                  <p className='mb-2 font-medium'>
-                    {t('Webhook Configuration:')}
-                  </p>
-                  <ul className='list-inside list-disc space-y-1'>
-                    <li>
-                      {t('Webhook URL:')}{' '}
-                      <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
-                        {'<ServerAddress>/api/stripe/webhook'}
-                      </code>
-                    </li>
-                    <li>
-                      {t('Required events:')}{' '}
-                      <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
-                        {t('checkout.session.completed')}
-                      </code>{' '}
-                      {t('and')}{' '}
-                      <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
-                        {t('checkout.session.expired')}
-                      </code>
-                    </li>
-                    <li>
-                      {t('Configure at:')}{' '}
-                      <a
-                        href='https://dashboard.stripe.com/developers'
-                        target='_blank'
-                        rel='noreferrer'
-                        className='underline hover:no-underline'
-                      >
-                        {t('Stripe Dashboard')}
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className='grid gap-6 md:grid-cols-3'>
-                  <FormField
-                    control={form.control}
-                    name='StripeApiSecret'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('API secret')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type='password'
-                            placeholder={t('sk_xxx or rk_xxx')}
-                            autoComplete='new-password'
-                            {...field}
-                            onChange={(event) =>
-                              field.onChange(event.target.value)
-                            }
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t('Stripe API key (leave blank unless updating)')}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
+                    {t(
+                      'Payment notifications are sent automatically to /api/bepusdt/notify on the configured callback domain.'
                     )}
-                  />
+                  </p>
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value='general'
+                className={paymentTabContentClassName}
+              >
+                <div className='space-y-4'>
+                  <div>
+                    <h3 className='text-lg font-medium'>
+                      {t('General Settings')}
+                    </h3>
+                    <p className='text-muted-foreground text-sm'>
+                      {t('Shared configuration for all payment gateways')}
+                    </p>
+                  </div>
+
+                  <div className='grid gap-6 md:grid-cols-2'>
+                    <FormField
+                      control={form.control}
+                      name='Price'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {t('Price (local currency / USD)')}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type='number'
+                              step='0.01'
+                              min={0}
+                              {...safeNumberFieldProps(field)}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t(
+                              'How much to charge for each US dollar of balance (Epay)'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='MinTopUp'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Minimum top-up (USD)')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type='number'
+                              step='0.01'
+                              min={0}
+                              {...safeNumberFieldProps(field)}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t('Smallest USD amount users can recharge (Epay)')}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <FormField
                     control={form.control}
-                    name='StripeWebhookSecret'
+                    name='PayMethods'
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('Webhook secret')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type='password'
-                            placeholder={t('whsec_xxx')}
-                            autoComplete='new-password'
-                            {...field}
-                            onChange={(event) =>
-                              field.onChange(event.target.value)
+                        <div className='mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                          <FormLabel>{t('Payment methods')}</FormLabel>
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={() =>
+                              setPayMethodsVisualMode(!payMethodsVisualMode)
                             }
-                          />
+                            className='w-full sm:w-auto'
+                          >
+                            {payMethodsVisualMode ? (
+                              <>
+                                <Code2 className='mr-2 h-3 w-3' />
+                                {t('JSON Editor')}
+                              </>
+                            ) : (
+                              <>
+                                <Eye className='mr-2 h-3 w-3' />
+                                {t('Visual Editor')}
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                        <FormControl>
+                          {payMethodsVisualMode ? (
+                            <PaymentMethodsVisualEditor
+                              value={field.value}
+                              onChange={field.onChange}
+                            />
+                          ) : (
+                            <JsonCodeEditor
+                              value={field.value}
+                              onChange={field.onChange}
+                              name={field.name}
+                              onBlur={field.onBlur}
+                              textareaRef={field.ref}
+                              placeholder={t(
+                                '[{"name":"支付宝","type":"alipay","icon":"SiAlipay"}]'
+                              )}
+                              heightClassName='h-40 min-h-40 max-h-40'
+                              aria-invalid={Boolean(
+                                form.formState.errors.PayMethods
+                              )}
+                            />
+                          )}
                         </FormControl>
                         <FormDescription>
                           {t(
-                            'Webhook signing secret (leave blank unless updating)'
+                            'Configured as PayMethods JSON. The type value decides which payment flow is used: stripe for Stripe, waffo_pancake for Waffo Pancake, and other values are sent to Epay as the type parameter.'
                           )}
                         </FormDescription>
                         <FormMessage />
@@ -1507,86 +1191,535 @@ export function PaymentSettingsSection({
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name='StripePriceId'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Price ID')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder={t('price_xxx')}
-                            {...field}
-                            onChange={(event) =>
-                              field.onChange(event.target.value)
-                            }
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t('Stripe product price ID')}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className='grid gap-6 md:grid-cols-2 md:items-start'>
+                    <FormField
+                      control={form.control}
+                      name='AmountOptions'
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className='mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                            <FormLabel>{t('Top-up amount options')}</FormLabel>
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={() =>
+                                setAmountOptionsVisualMode(
+                                  !amountOptionsVisualMode
+                                )
+                              }
+                              className='w-full sm:w-auto'
+                            >
+                              {amountOptionsVisualMode ? (
+                                <>
+                                  <Code2 className='mr-2 h-3 w-3' />
+                                  {t('JSON Editor')}
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className='mr-2 h-3 w-3' />
+                                  {t('Visual Editor')}
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                          <FormControl>
+                            {amountOptionsVisualMode ? (
+                              <AmountOptionsVisualEditor
+                                value={field.value}
+                                onChange={field.onChange}
+                              />
+                            ) : (
+                              <JsonCodeEditor
+                                value={field.value}
+                                onChange={field.onChange}
+                                name={field.name}
+                                onBlur={field.onBlur}
+                                textareaRef={field.ref}
+                                placeholder='[10, 20, 50, 100]'
+                                heightClassName='h-40 min-h-40 max-h-40'
+                                aria-invalid={Boolean(
+                                  form.formState.errors.AmountOptions
+                                )}
+                              />
+                            )}
+                          </FormControl>
+                          <FormDescription>
+                            {t('Preset recharge amounts (JSON array)')}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='AmountDiscount'
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className='mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                            <FormLabel>{t('Amount discount')}</FormLabel>
+                            <Button
+                              type='button'
+                              variant='outline'
+                              size='sm'
+                              onClick={() =>
+                                setAmountDiscountVisualMode(
+                                  !amountDiscountVisualMode
+                                )
+                              }
+                              className='w-full sm:w-auto'
+                            >
+                              {amountDiscountVisualMode ? (
+                                <>
+                                  <Code2 className='mr-2 h-3 w-3' />
+                                  {t('JSON Editor')}
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className='mr-2 h-3 w-3' />
+                                  {t('Visual Editor')}
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                          <FormControl>
+                            {amountDiscountVisualMode ? (
+                              <AmountDiscountVisualEditor
+                                value={field.value}
+                                onChange={field.onChange}
+                              />
+                            ) : (
+                              <JsonCodeEditor
+                                value={field.value}
+                                onChange={field.onChange}
+                                name={field.name}
+                                onBlur={field.onBlur}
+                                textareaRef={field.ref}
+                                placeholder='{"100":0.95,"200":0.9}'
+                                heightClassName='h-40 min-h-40 max-h-40'
+                                aria-invalid={Boolean(
+                                  form.formState.errors.AmountDiscount
+                                )}
+                              />
+                            )}
+                          </FormControl>
+                          <FormDescription>
+                            {t('Discount map by recharge amount (JSON object)')}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
+              </TabsContent>
 
-                <div className='grid gap-6 md:grid-cols-3'>
+              <TabsContent value='epay' className={paymentTabContentClassName}>
+                <div className='space-y-4'>
+                  <div>
+                    <h3 className='text-lg font-medium'>{t('Epay Gateway')}</h3>
+                    <p className='text-muted-foreground text-sm'>
+                      {t('Configuration for Epay payment integration')}
+                    </p>
+                  </div>
+
+                  <Alert>
+                    <ShieldAlert className='h-4 w-4' />
+                    <AlertTitle>{t('Epay safety reminder')}</AlertTitle>
+                    <AlertDescription>
+                      {t(
+                        'Epay is a payment protocol, not a specific official website. Verify the provider yourself and do not trust random third-party Epay deployments.'
+                      )}
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className='grid gap-6 md:grid-cols-2'>
+                    <FormField
+                      control={form.control}
+                      name='PayAddress'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Epay endpoint')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder={t('https://pay.example.com')}
+                              {...field}
+                              onChange={(event) =>
+                                field.onChange(event.target.value)
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t('Base address provided by your Epay service')}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='CustomCallbackAddress'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Callback address')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder={t('https://gateway.example.com')}
+                              {...field}
+                              onChange={(event) =>
+                                field.onChange(event.target.value)
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t(
+                              'Only enter the site origin, for example https://api.example.com. Do not include any path such as /api/user/epay/notify. Leave blank to use the server address.'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className='grid gap-6 md:grid-cols-2'>
+                    <FormField
+                      control={form.control}
+                      name='EpayId'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Epay merchant ID')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder='10001'
+                              autoComplete='off'
+                              {...field}
+                              onChange={(event) =>
+                                field.onChange(event.target.value)
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='EpayKey'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Epay secret key')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type='password'
+                              placeholder={t('Enter new key to update')}
+                              autoComplete='new-password'
+                              {...field}
+                              onChange={(event) =>
+                                field.onChange(event.target.value)
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t('Leave blank unless rotating the secret')}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value='stripe'
+                className={paymentTabContentClassName}
+              >
+                <div className='space-y-4'>
+                  <div>
+                    <h3 className='text-lg font-medium'>
+                      {t('Stripe Gateway')}
+                    </h3>
+                    <p className='text-muted-foreground text-sm'>
+                      {t('Configuration for Stripe payment integration')}
+                    </p>
+                  </div>
+
+                  <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+                    <p className='mb-2 font-medium'>
+                      {t('Webhook Configuration:')}
+                    </p>
+                    <ul className='list-inside list-disc space-y-1'>
+                      <li>
+                        {t('Webhook URL:')}{' '}
+                        <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                          {'<ServerAddress>/api/stripe/webhook'}
+                        </code>
+                      </li>
+                      <li>
+                        {t('Required events:')}{' '}
+                        <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                          {t('checkout.session.completed')}
+                        </code>{' '}
+                        {t('and')}{' '}
+                        <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                          {t('checkout.session.expired')}
+                        </code>
+                      </li>
+                      <li>
+                        {t('Configure at:')}{' '}
+                        <a
+                          href='https://dashboard.stripe.com/developers'
+                          target='_blank'
+                          rel='noreferrer'
+                          className='underline hover:no-underline'
+                        >
+                          {t('Stripe Dashboard')}
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className='grid gap-6 md:grid-cols-3'>
+                    <FormField
+                      control={form.control}
+                      name='StripeApiSecret'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('API secret')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type='password'
+                              placeholder={t('sk_xxx or rk_xxx')}
+                              autoComplete='new-password'
+                              {...field}
+                              onChange={(event) =>
+                                field.onChange(event.target.value)
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t('Stripe API key (leave blank unless updating)')}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='StripeWebhookSecret'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Webhook secret')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type='password'
+                              placeholder={t('whsec_xxx')}
+                              autoComplete='new-password'
+                              {...field}
+                              onChange={(event) =>
+                                field.onChange(event.target.value)
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t(
+                              'Webhook signing secret (leave blank unless updating)'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='StripePriceId'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Price ID')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder={t('price_xxx')}
+                              {...field}
+                              onChange={(event) =>
+                                field.onChange(event.target.value)
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t('Stripe product price ID')}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className='grid gap-6 md:grid-cols-3'>
+                    <FormField
+                      control={form.control}
+                      name='StripeUnitPrice'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {t('Unit price (local currency / USD)')}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type='number'
+                              step='0.01'
+                              min={0}
+                              {...safeNumberFieldProps(field)}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t('e.g., 8 means 8 local currency per USD')}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='StripeMinTopUp'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Minimum top-up (USD)')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type='number'
+                              step='0.01'
+                              min={0}
+                              {...safeNumberFieldProps(field)}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t('Minimum recharge amount in USD')}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='StripePromotionCodesEnabled'
+                      render={({ field }) => (
+                        <SettingsSwitchItem>
+                          <SettingsSwitchContent>
+                            <FormLabel>{t('Promotion codes')}</FormLabel>
+                            <FormDescription>
+                              {t('Allow users to enter promo codes')}
+                            </FormDescription>
+                          </SettingsSwitchContent>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </SettingsSwitchItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value='creem' className={paymentTabContentClassName}>
+                <div className='space-y-4'>
+                  <div>
+                    <h3 className='text-lg font-medium'>
+                      {t('Creem Gateway')}
+                    </h3>
+                    <p className='text-muted-foreground text-sm'>
+                      {t('Configuration for Creem payment integration')}
+                    </p>
+                  </div>
+
+                  <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
+                    <p className='mb-2 font-medium'>
+                      {t('Webhook Configuration:')}
+                    </p>
+                    <ul className='list-inside list-disc space-y-1'>
+                      <li>
+                        {t('Webhook URL:')}{' '}
+                        <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
+                          {'<ServerAddress>/api/creem/webhook'}
+                        </code>
+                      </li>
+                      <li>{t('Configure in your Creem dashboard')}</li>
+                    </ul>
+                  </div>
+
+                  <div className='grid gap-6 md:grid-cols-2'>
+                    <FormField
+                      control={form.control}
+                      name='CreemApiKey'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('API Key')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type='password'
+                              placeholder={t('Enter Creem API key')}
+                              autoComplete='new-password'
+                              {...field}
+                              onChange={(event) =>
+                                field.onChange(event.target.value)
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t('Creem API key (leave blank unless updating)')}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='CreemWebhookSecret'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Webhook Secret')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type='password'
+                              placeholder={t('Enter webhook secret')}
+                              autoComplete='new-password'
+                              {...field}
+                              onChange={(event) =>
+                                field.onChange(event.target.value)
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t(
+                              'Webhook signing secret (leave blank unless updating)'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
-                    name='StripeUnitPrice'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {t('Unit price (local currency / USD)')}
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type='number'
-                            step='0.01'
-                            min={0}
-                            {...safeNumberFieldProps(field)}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t('e.g., 8 means 8 local currency per USD')}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name='StripeMinTopUp'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('Minimum top-up (USD)')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type='number'
-                            step='0.01'
-                            min={0}
-                            {...safeNumberFieldProps(field)}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t('Minimum recharge amount in USD')}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name='StripePromotionCodesEnabled'
+                    name='CreemTestMode'
                     render={({ field }) => (
                       <SettingsSwitchItem>
                         <SettingsSwitchContent>
-                          <FormLabel>{t('Promotion codes')}</FormLabel>
+                          <FormLabel>{t('Test Mode')}</FormLabel>
                           <FormDescription>
-                            {t('Allow users to enter promo codes')}
+                            {t('Enable test mode for Creem payments')}
                           </FormDescription>
                         </SettingsSwitchContent>
                         <FormControl>
@@ -1598,194 +1731,95 @@ export function PaymentSettingsSection({
                       </SettingsSwitchItem>
                     )}
                   />
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value='creem' className={paymentTabContentClassName}>
-              <div className='space-y-4'>
-                <div>
-                  <h3 className='text-lg font-medium'>{t('Creem Gateway')}</h3>
-                  <p className='text-muted-foreground text-sm'>
-                    {t('Configuration for Creem payment integration')}
-                  </p>
-                </div>
-
-                <div className='rounded-md bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100'>
-                  <p className='mb-2 font-medium'>
-                    {t('Webhook Configuration:')}
-                  </p>
-                  <ul className='list-inside list-disc space-y-1'>
-                    <li>
-                      {t('Webhook URL:')}{' '}
-                      <code className='rounded bg-blue-100 px-1 py-0.5 text-xs dark:bg-blue-900'>
-                        {'<ServerAddress>/api/creem/webhook'}
-                      </code>
-                    </li>
-                    <li>{t('Configure in your Creem dashboard')}</li>
-                  </ul>
-                </div>
-
-                <div className='grid gap-6 md:grid-cols-2'>
-                  <FormField
-                    control={form.control}
-                    name='CreemApiKey'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('API Key')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type='password'
-                            placeholder={t('Enter Creem API key')}
-                            autoComplete='new-password'
-                            {...field}
-                            onChange={(event) =>
-                              field.onChange(event.target.value)
-                            }
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t('Creem API key (leave blank unless updating)')}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
 
                   <FormField
                     control={form.control}
-                    name='CreemWebhookSecret'
+                    name='CreemProducts'
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('Webhook Secret')}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type='password'
-                            placeholder={t('Enter webhook secret')}
-                            autoComplete='new-password'
-                            {...field}
-                            onChange={(event) =>
-                              field.onChange(event.target.value)
+                        <div className='mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                          <FormLabel>{t('Products')}</FormLabel>
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={() =>
+                              setCreemProductsVisualMode(
+                                !creemProductsVisualMode
+                              )
                             }
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {t(
-                            'Webhook signing secret (leave blank unless updating)'
-                          )}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name='CreemTestMode'
-                  render={({ field }) => (
-                    <SettingsSwitchItem>
-                      <SettingsSwitchContent>
-                        <FormLabel>{t('Test Mode')}</FormLabel>
-                        <FormDescription>
-                          {t('Enable test mode for Creem payments')}
-                        </FormDescription>
-                      </SettingsSwitchContent>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </SettingsSwitchItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name='CreemProducts'
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className='mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                        <FormLabel>{t('Products')}</FormLabel>
-                        <Button
-                          type='button'
-                          variant='outline'
-                          size='sm'
-                          onClick={() =>
-                            setCreemProductsVisualMode(!creemProductsVisualMode)
-                          }
-                          className='w-full sm:w-auto'
-                        >
-                          {creemProductsVisualMode ? (
-                            <>
-                              <Code2 className='mr-2 h-3 w-3' />
-                              {t('JSON Editor')}
-                            </>
-                          ) : (
-                            <>
-                              <Eye className='mr-2 h-3 w-3' />
-                              {t('Visual Editor')}
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                      <FormControl>
-                        {creemProductsVisualMode ? (
-                          <CreemProductsVisualEditor
-                            value={field.value}
-                            onChange={field.onChange}
-                          />
-                        ) : (
-                          <JsonCodeEditor
-                            value={field.value}
-                            onChange={field.onChange}
-                            name={field.name}
-                            onBlur={field.onBlur}
-                            textareaRef={field.ref}
-                            placeholder='[{"name":"Basic","productId":"prod_xxx","price":10,"quota":500000,"currency":"USD"}]'
-                            heightClassName='h-40 min-h-40 max-h-40'
-                            aria-invalid={Boolean(
-                              form.formState.errors.CreemProducts
+                            className='w-full sm:w-auto'
+                          >
+                            {creemProductsVisualMode ? (
+                              <>
+                                <Code2 className='mr-2 h-3 w-3' />
+                                {t('JSON Editor')}
+                              </>
+                            ) : (
+                              <>
+                                <Eye className='mr-2 h-3 w-3' />
+                                {t('Visual Editor')}
+                              </>
                             )}
-                          />
-                        )}
-                      </FormControl>
-                      <FormDescription>
-                        {t('Configure Creem products. Provide a JSON array.')}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                          </Button>
+                        </div>
+                        <FormControl>
+                          {creemProductsVisualMode ? (
+                            <CreemProductsVisualEditor
+                              value={field.value}
+                              onChange={field.onChange}
+                            />
+                          ) : (
+                            <JsonCodeEditor
+                              value={field.value}
+                              onChange={field.onChange}
+                              name={field.name}
+                              onBlur={field.onBlur}
+                              textareaRef={field.ref}
+                              placeholder='[{"name":"Basic","productId":"prod_xxx","price":10,"quota":500000,"currency":"USD"}]'
+                              heightClassName='h-40 min-h-40 max-h-40'
+                              aria-invalid={Boolean(
+                                form.formState.errors.CreemProducts
+                              )}
+                            />
+                          )}
+                        </FormControl>
+                        <FormDescription>
+                          {t('Configure Creem products. Provide a JSON array.')}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value='waffo-pancake'
+                className={paymentTabContentClassName}
+              >
+                <WaffoPancakeSettingsSection
+                  defaultValues={waffoPancakeDefaultValues}
+                  values={waffoPancakeValues}
+                  onValueChange={setWaffoPancakeValue}
+                  selectedBinding={waffoPancakeSelection}
+                  savedBinding={waffoPancakeSavedBinding}
+                  onSelectedBindingChange={setWaffoPancakeSelection}
                 />
-              </div>
-            </TabsContent>
+              </TabsContent>
 
-            <TabsContent
-              value='waffo-pancake'
-              className={paymentTabContentClassName}
-            >
-              <WaffoPancakeSettingsSection
-                defaultValues={waffoPancakeDefaultValues}
-                values={waffoPancakeValues}
-                onValueChange={setWaffoPancakeValue}
-                selectedBinding={waffoPancakeSelection}
-                savedBinding={waffoPancakeSavedBinding}
-                onSelectedBindingChange={setWaffoPancakeSelection}
-              />
-            </TabsContent>
-
-            <TabsContent value='waffo' className={paymentTabContentClassName}>
-              <WaffoSettingsSection
-                values={waffoValues}
-                onValueChange={setWaffoValue}
-                payMethods={waffoPayMethods}
-                onPayMethodsChange={setWaffoPayMethods}
-              />
-            </TabsContent>
-          </Tabs>
-        </SettingsForm>
-      </Form>
+              <TabsContent value='waffo' className={paymentTabContentClassName}>
+                <WaffoSettingsSection
+                  values={waffoValues}
+                  onValueChange={setWaffoValue}
+                  payMethods={waffoPayMethods}
+                  onPayMethodsChange={setWaffoPayMethods}
+                />
+              </TabsContent>
+            </Tabs>
+          </SettingsForm>
+        </Form>
+      </details>
     </SettingsSection>
   )
 }

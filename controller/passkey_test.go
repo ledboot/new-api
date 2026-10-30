@@ -677,7 +677,7 @@ func TestPasskeyDomainErrorsReturnMessageKeys(t *testing.T) {
 		unavailable = "This Passkey domain is not available on this website. Use its original website or another verification method."
 		removal     = "Review the affected Passkeys and confirm the domain removal. If the settings or impact have changed, confirmation is required again."
 	)
-	for _, language := range []string{"zh-CN", "zh-TW", "en"} {
+	for _, language := range []string{"zh-CN", "en"} {
 		t.Run(language, func(t *testing.T) {
 			for _, request := range []struct {
 				path, body, code, message string

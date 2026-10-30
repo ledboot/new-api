@@ -292,3 +292,28 @@ func TestCacheUpdateChannelSyncsAdvancedCustomConfig(t *testing.T) {
 
 	assert.Nil(t, channel2advancedCustomConfig[401])
 }
+
+// The model square compares the site price with the vendor list price, which is
+// decoded from the built-in default ratios. Models without a built-in default
+// must not claim a baseline.
+func TestPricingExposesOfficialBaselinePrices(t *testing.T) {
+	resetPricingEndpointTestTables(t)
+	insertPricingEndpointChannel(t, 912, constant.ChannelTypeOpenAI, dto.ChannelOtherSettings{})
+	insertPricingEndpointAbility(t, 912, "gpt-4o")
+	insertPricingEndpointAbility(t, 912, "zz-model-without-default")
+
+	pricing := pricingByModel(GetPricing())
+	require.Contains(t, pricing, "gpt-4o")
+	require.Contains(t, pricing, "zz-model-without-default")
+
+	official := pricing["gpt-4o"]
+	assert.InDelta(t, 2.5, official.OfficialInputPrice, 0.0001, "built-in ratio 1.25 = $2.5 / 1M tokens")
+	assert.Positive(t, official.OfficialOutputPrice)
+	assert.Zero(t, official.OfficialRequestPrice)
+	assert.Equal(t, OfficialPriceSourceDefault, official.OfficialPriceSource)
+
+	missing := pricing["zz-model-without-default"]
+	assert.Zero(t, missing.OfficialInputPrice)
+	assert.Zero(t, missing.OfficialOutputPrice)
+	assert.Empty(t, missing.OfficialPriceSource)
+}

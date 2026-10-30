@@ -268,6 +268,9 @@ export type ModelSettings = {
   'group_ratio_setting.group_special_usable_group': string
   'model_deployment.ionet.api_key': string
   'model_deployment.ionet.enabled': boolean
+  'official_price_setting.enabled': boolean
+  'official_price_setting.interval_hours': number
+  'official_price_setting.source_url': string
 }
 
 export type BillingSettings = {

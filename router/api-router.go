@@ -65,6 +65,8 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.POST("/creem/webhook", anonymousRequestBodyLimit, controller.CreemWebhook)
 		apiRouter.POST("/waffo/webhook", anonymousRequestBodyLimit, controller.WaffoWebhook)
 		apiRouter.POST("/bepusdt/notify", anonymousRequestBodyLimit, controller.BepusdtNotify)
+		apiRouter.GET("/payment/channels/:provider/:id/notify", controller.PaymentChannelNotify)
+		apiRouter.POST("/payment/channels/:provider/:id/notify", anonymousRequestBodyLimit, controller.PaymentChannelNotify)
 		// :env separates test vs prod URLs so the operator can register each
 		// in Pancake's matching webhook slot; handler enforces env match.
 		apiRouter.POST("/waffo-pancake/webhook/:env", anonymousRequestBodyLimit, controller.WaffoPancakeWebhook)
@@ -121,6 +123,9 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.DELETE("/passkey", middleware.DisableCache(), controller.PasskeyDelete)
 				selfRoute.GET("/aff", controller.GetAffCode)
 				selfRoute.GET("/topup/info", controller.GetTopUpInfo)
+				selfRoute.POST("/payment/amount", controller.RequestChannelPayment)
+				selfRoute.POST("/payment/checkout", middleware.CriticalRateLimit(), controller.RequestChannelPayment)
+				selfRoute.GET("/payment/orders/:order", controller.GetChannelPaymentStatus)
 				selfRoute.GET("/topup/self", controller.GetUserTopUps)
 				selfRoute.POST("/topup", middleware.CriticalRateLimit(), controller.TopUp)
 				selfRoute.POST("/pay", middleware.CriticalRateLimit(), controller.RequestEpay)
@@ -216,6 +221,13 @@ func SetApiRouter(router *gin.Engine) {
 		optionRoute.Use(middleware.RootAuth())
 		{
 			optionRoute.GET("/", controller.GetOptions)
+			optionRoute.GET("/official_prices", controller.GetOfficialPrices)
+			optionRoute.PUT("/official_prices", controller.SaveOfficialPrice)
+			optionRoute.DELETE("/official_prices", controller.ResetOfficialPrice)
+			optionRoute.POST("/official_prices/sync", controller.SyncOfficialPricesNow)
+			optionRoute.GET("/payment_channels", controller.GetPaymentChannels)
+			optionRoute.POST("/payment_channels", controller.SavePaymentChannel)
+			optionRoute.DELETE("/payment_channels/:id", controller.DeletePaymentChannel)
 			optionRoute.GET("/request_policy", controller.GetRequestPolicy)
 			optionRoute.PATCH("/request_policy", controller.UpdateRequestPolicy)
 			optionRoute.PUT("/", controller.UpdateOption)

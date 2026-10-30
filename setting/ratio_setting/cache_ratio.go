@@ -184,3 +184,14 @@ func GetCacheRatioCopy() map[string]float64 {
 func GetCreateCacheRatioCopy() map[string]float64 {
 	return createCacheRatioMap.ReadAll()
 }
+
+// GetDefaultCacheRatioMap exposes the built-in cache-read ratios as a read-only
+// baseline for official list prices.
+func GetDefaultCacheRatioMap() map[string]float64 {
+	return defaultCacheRatio
+}
+
+// GetDefaultCreateCacheRatioMap exposes the built-in cache-write ratios.
+func GetDefaultCreateCacheRatioMap() map[string]float64 {
+	return defaultCreateCacheRatio
+}

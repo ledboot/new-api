@@ -26,6 +26,7 @@ import { getSelf } from '@/lib/api'
 
 import { AffiliateRewardsCard } from './components/affiliate-rewards-card'
 import { BillingHistoryDialog } from './components/dialogs/billing-history-dialog'
+import { ChannelPaymentDialog } from './components/dialogs/channel-payment-dialog'
 import { CreemConfirmDialog } from './components/dialogs/creem-confirm-dialog'
 import { PaymentConfirmDialog } from './components/dialogs/payment-confirm-dialog'
 import { TransferDialog } from './components/dialogs/transfer-dialog'
@@ -92,6 +93,8 @@ export function Wallet(props: WalletProps) {
   }, [currency?.quotaDisplayType, currency?.usdExchangeRate])
   const {
     amount: paymentAmount,
+    channelCheckout,
+    clearChannelCheckout,
     calculating,
     processing,
     calculatePaymentAmount,
@@ -155,6 +158,18 @@ export function Wallet(props: WalletProps) {
     return selectedPaymentMethod?.type || getDefaultPaymentType(topupInfo)
   }, [selectedPaymentMethod, topupInfo])
 
+  const currentMethod =
+    selectedPaymentMethod ||
+    topupInfo?.pay_methods.find(
+      (method) => method.type === getCurrentPaymentType()
+    )
+
+  let paymentCurrency = ''
+  if (currentMethod?.currency) paymentCurrency = ` ${currentMethod.currency}`
+  else if (getCurrentPaymentType() === PAYMENT_TYPES.BEPUSDT) {
+    paymentCurrency = ' USD'
+  }
+
   // Handle preset selection
   const handleSelectPreset = (preset: PresetAmount) => {
     setTopupAmount(preset.value)
@@ -177,14 +192,18 @@ export function Wallet(props: WalletProps) {
 
     try {
       // Validate minimum topup
-      const minTopup = getMinTopupAmount(topupInfo)
-      if (topupAmount < minTopup) {
+      const selectedAmount = method.fixed_amount || topupAmount
+      if (method.fixed_amount) setTopupAmount(method.fixed_amount)
+      const minTopup = method.type.startsWith('channel:')
+        ? method.min_topup || 0
+        : getMinTopupAmount(topupInfo)
+      if (!method.fixed_amount && selectedAmount < minTopup) {
         return
       }
 
       // Calculate payment amount and show confirmation dialog
-      await calculatePaymentAmount(topupAmount, method.type)
-      setConfirmDialogOpen(true)
+      const quote = await calculatePaymentAmount(selectedAmount, method.type)
+      if (quote > 0) setConfirmDialogOpen(true)
     } finally {
       setPaymentLoading(null)
     }
@@ -300,7 +319,9 @@ export function Wallet(props: WalletProps) {
               <div id='wallet-add-funds' className='scroll-mt-4'>
                 <RechargeFormCard
                   topupInfo={topupInfo}
-                  presetAmounts={presetAmounts}
+                  presetAmounts={
+                    currentMethod?.fixed_amount ? [] : presetAmounts
+                  }
                   selectedPreset={selectedPreset}
                   onSelectPreset={handleSelectPreset}
                   topupAmount={topupAmount}
@@ -315,20 +336,20 @@ export function Wallet(props: WalletProps) {
                   redeeming={redeeming}
                   topupLink={topupInfo?.topup_link}
                   loading={topupLoading}
-                  paymentCurrency={
-                    getCurrentPaymentType() === PAYMENT_TYPES.BEPUSDT
-                      ? ' USD'
-                      : ''
-                  }
+                  paymentCurrency={paymentCurrency}
                   priceRatio={
-                    getCurrentPaymentType() === PAYMENT_TYPES.BEPUSDT
+                    currentMethod?.unit_price ??
+                    (getCurrentPaymentType() === PAYMENT_TYPES.BEPUSDT
                       ? topupInfo?.bepusdt_unit_price || 1
-                      : (status?.price as number) || 1
+                      : (status?.price as number) || 1)
                   }
                   usdExchangeRate={effectiveUsdExchangeRate}
                   onOpenBilling={() => setBillingDialogOpen(true)}
                   creemProducts={topupInfo?.creem_products}
-                  enableCreemTopup={topupInfo?.enable_creem_topup}
+                  enableCreemTopup={
+                    topupInfo?.enable_creem_topup &&
+                    !!topupInfo?.creem_products?.length
+                  }
                   onCreemProductSelect={handleCreemProductSelect}
                   enableWaffoTopup={topupInfo?.enable_waffo_topup}
                   waffoPayMethods={topupInfo?.waffo_pay_methods}
@@ -361,6 +382,16 @@ export function Wallet(props: WalletProps) {
         </SectionPageLayout.Content>
       </SectionPageLayout>
 
+      {channelCheckout && (
+        <ChannelPaymentDialog
+          checkout={channelCheckout}
+          onClose={clearChannelCheckout}
+          onPaid={() => {
+            clearChannelCheckout()
+            void fetchUser()
+          }}
+        />
+      )}
       <PaymentConfirmDialog
         open={confirmDialogOpen}
         onOpenChange={setConfirmDialogOpen}

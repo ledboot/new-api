@@ -37,7 +37,6 @@ import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import zhTW from '@/i18n/locales/zh-TW.json'
 import zh from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 
@@ -283,10 +282,7 @@ it('collapses only date and statistics while keeping the right-hand quick action
   expect(await screen.findByText('Usage')).toBeVisible()
 })
 
-it.each([
-  { language: 'zh', resources: zh.translation },
-  { language: 'zh-TW', resources: zhTW.translation },
-])(
+it.each([{ language: 'zh', resources: zh.translation }])(
   'labels the calendar-month preset as 本月 in $language and selects the complete month',
   async ({ language, resources }) => {
     vi.useFakeTimers({ toFake: ['Date'] })

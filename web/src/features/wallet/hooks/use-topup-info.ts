@@ -72,6 +72,14 @@ function parsePaymentMethods(
       return {
         name: typeof item.name === 'string' ? item.name : '',
         type,
+        provider: typeof item.provider === 'string' ? item.provider : undefined,
+        channel_name:
+          typeof item.channel_name === 'string' ? item.channel_name : undefined,
+        currency: typeof item.currency === 'string' ? item.currency : undefined,
+        interaction:
+          typeof item.interaction === 'string' ? item.interaction : undefined,
+        fixed_amount: Number(item.fixed_amount) || undefined,
+        unit_price: Number(item.unit_price) || undefined,
         color: typeof item.color === 'string' ? item.color : undefined,
         icon: typeof item.icon === 'string' ? item.icon : undefined,
         min_topup:
@@ -187,6 +195,12 @@ export function useTopupInfo() {
           response.data.pay_methods,
           response.data.stripe_min_topup
         ),
+        subscription_pay_methods: response.data.subscription_pay_methods
+          ? parsePaymentMethods(
+              response.data.subscription_pay_methods,
+              response.data.stripe_min_topup
+            )
+          : undefined,
         amount_options: parseAmountOptions(response.data.amount_options),
         discount: parseDiscountMap(response.data.discount),
         creem_products: parseCreemProducts(response.data.creem_products),

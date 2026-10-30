@@ -719,7 +719,7 @@ func TestSecurityAccountMailsFollowTheOwnersLanguage(t *testing.T) {
 	for _, tc := range []struct {
 		name, saved, acceptLanguage, receiver, want string
 	}{
-		{"request language when none is saved", "", "zh-TW", "tw@example.com", "您的帳戶安全設定有變動：已綁定登入帳號 &lt;b&gt;Corp&lt;/b&gt;。"},
+		{"request language when none is saved", "", "zh-CN", "tw@example.com", "您的账户安全设置有变动：已绑定登录账号 &lt;b&gt;Corp&lt;/b&gt;。"},
 		{"saved language over the request", "en", "zh-CN", "en@example.com", "Your account security settings have changed: Login account linked: &lt;b&gt;Corp&lt;/b&gt;."},
 		{"default language when neither states one", "", "", "default@example.com", "Your account security settings have changed: Login account linked: &lt;b&gt;Corp&lt;/b&gt;."},
 	} {

@@ -408,6 +408,12 @@ func GetDefaultModelPriceMap() map[string]float64 {
 	return defaultModelPrice
 }
 
+// GetDefaultCompletionRatioMap exposes the built-in completion ratios so callers
+// can derive an "official list price" baseline. Treat it as read-only.
+func GetDefaultCompletionRatioMap() map[string]float64 {
+	return defaultCompletionRatio
+}
+
 // GetDefaultPricingMaps returns independent copies for model-level reset and
 // first-write initialization; callers cannot mutate the built-in defaults.
 func GetDefaultPricingMaps() map[string]map[string]float64 {

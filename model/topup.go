@@ -13,6 +13,9 @@ import (
 )
 
 type TopUp struct {
+	WalletAmount    string  `json:"wallet_amount,omitempty" gorm:"-"`
+	PaymentCurrency string  `json:"payment_currency,omitempty" gorm:"-"`
+	PaymentName     string  `json:"payment_name,omitempty" gorm:"-"`
 	Id              int     `json:"id"`
 	UserId          int     `json:"user_id" gorm:"index"`
 	Amount          int64   `json:"amount"`
@@ -484,7 +487,16 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		// - Stripe 订单：Money 代表经分组倍率换算后的美元数量，直接 * QuotaPerUnit
 		// - 其他订单（如易支付）：Amount 为美元数量，* QuotaPerUnit
 		var quotaErr error
-		if topUp.PaymentProvider == PaymentProviderStripe {
+		if topUp.PaymentProvider == PaymentProviderChannel {
+			var snapshot PaymentChannelOrder
+			if err := tx.Where("trade_no = ?", tradeNo).First(&snapshot).Error; err != nil {
+				return err
+			}
+			quotaToAdd = snapshot.CreditedQuota
+			if quotaToAdd > common.MaxWalletQuota {
+				return ErrInvalidTopUpQuota
+			}
+		} else if topUp.PaymentProvider == PaymentProviderStripe {
 			quotaToAdd, quotaErr = common.WalletQuotaFromDecimalStrict(
 				decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)),
 			)

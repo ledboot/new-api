@@ -51,7 +51,8 @@ const NEW_API_FOOTER_ATTRIBUTION_KEY = [
 
 function FooterLinkItem(props: { link: FooterLink }) {
   const { t } = useTranslation()
-  const isExternal = props.link.href.startsWith('http')
+  const [pathname, hash] = props.link.href.split('#')
+  const isExternal = /^https?:/i.test(pathname)
   const label = t(props.link.text)
 
   if (isExternal) {
@@ -69,7 +70,8 @@ function FooterLinkItem(props: { link: FooterLink }) {
 
   return (
     <Link
-      to={props.link.href}
+      to={pathname}
+      hash={hash}
       className='text-muted-foreground hover:text-foreground text-sm transition-colors duration-200'
     >
       {label}
@@ -171,15 +173,15 @@ export function Footer(props: FooterProps) {
         links: [
           {
             text: t('footer.columns.about.links.aboutProject'),
-            href: 'https://docs.newapi.pro/wiki/project-introduction/',
+            href: '/docs#overview',
           },
           {
             text: t('footer.columns.about.links.contact'),
-            href: 'https://docs.newapi.pro/support/community-interaction/',
+            href: 'https://github.com/QuantumNous/new-api/issues',
           },
           {
             text: t('footer.columns.about.links.features'),
-            href: 'https://docs.newapi.pro/wiki/features-introduction/',
+            href: '/docs#advantages',
           },
         ],
       },
@@ -188,15 +190,11 @@ export function Footer(props: FooterProps) {
         links: [
           {
             text: t('footer.columns.docs.links.quickStart'),
-            href: 'https://docs.newapi.pro/getting-started/',
-          },
-          {
-            text: t('footer.columns.docs.links.installation'),
-            href: 'https://docs.newapi.pro/installation/',
+            href: '/docs#quickstart',
           },
           {
             text: t('footer.columns.docs.links.apiDocs'),
-            href: 'https://docs.newapi.pro/api/',
+            href: '/docs#endpoints',
           },
         ],
       },

@@ -69,6 +69,14 @@ export type PricingModel = {
   model_ratio: number
   completion_ratio: number
   model_price?: number
+  /** Vendor list price used for the comparison hint (USD). */
+  official_input_price?: number
+  official_output_price?: number
+  official_request_price?: number
+  official_cache_read_price?: number
+  official_cache_write_price?: number
+  official_cache_write_1h_price?: number
+  official_price_source?: 'default' | 'sync' | 'manual'
   cache_ratio?: number | null
   create_cache_ratio?: number | null
   image_ratio?: number | null

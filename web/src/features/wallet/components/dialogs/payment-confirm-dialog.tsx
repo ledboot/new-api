@@ -62,8 +62,11 @@ export function PaymentConfirmDialog({
   usdExchangeRate = 1,
 }: PaymentConfirmDialogProps) {
   const { t } = useTranslation()
-  const paymentCurrency =
-    paymentMethod?.type === PAYMENT_TYPES.BEPUSDT ? ' USD' : ''
+  let paymentCurrency = ''
+  if (paymentMethod?.currency) paymentCurrency = ` ${paymentMethod.currency}`
+  else if (paymentMethod?.type === PAYMENT_TYPES.BEPUSDT) {
+    paymentCurrency = ' USD'
+  }
   const hasDiscount = discountRate > 0 && discountRate < 1 && paymentAmount > 0
   const originalAmount = hasDiscount ? paymentAmount / discountRate : 0
   const discountAmount = hasDiscount ? originalAmount - paymentAmount : 0
@@ -150,7 +153,10 @@ export function PaymentConfirmDialog({
           <AlertDialogCancel disabled={processing}>
             {t('Cancel')}
           </AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} disabled={processing}>
+          <AlertDialogAction
+            onClick={onConfirm}
+            disabled={processing || calculating || paymentAmount <= 0}
+          >
             {processing && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
             {t('Confirm Payment')}
           </AlertDialogAction>

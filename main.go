@@ -118,6 +118,9 @@ func main() {
 	// 周期性重载授权策略，保证多节点/多 master 部署下权限变更能传播到每个实例
 	go authz.StartPolicySync(common.SyncFrequency)
 
+	// 官方参考价定时同步（仅 master 节点，按设置间隔执行）
+	go service.StartOfficialPriceSync()
+
 	// 数据看板
 	go model.UpdateQuotaData()
 
@@ -334,6 +337,11 @@ func InitResources() error {
 		}
 	}
 	model.InitOptionMap()
+	if common.IsMasterNode {
+		if err := controller.ImportLegacyPaymentChannels(); err != nil {
+			return fmt.Errorf("import payment channels: %w", err)
+		}
+	}
 
 	// 清理旧的磁盘缓存文件
 	common.CleanupOldCacheFiles()

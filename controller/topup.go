@@ -122,7 +122,38 @@ func GetTopUpInfo(c *gin.Context) {
 	if enableBepusdt {
 		payMethods = append(payMethods, map[string]string{"name": "BEpusdt", "type": model.PaymentMethodBepusdt, "min_topup": strconv.FormatInt(bepusdtMin, 10)})
 	}
+	subscriptionPayMethods := append([]map[string]string(nil), payMethods...)
+	walletGroup, _ := model.GetUserGroup(c.GetInt("id"), true)
+	channelMethods, migratedProviders, channelErr := channelWalletMethods(walletGroup)
+	if channelErr != nil {
+		common.ApiError(c, channelErr)
+		return
+	}
+	payMethods = slices.DeleteFunc(payMethods, func(method map[string]string) bool {
+		provider := method["type"]
+		if provider != "stripe" && provider != "creem" && provider != "bepusdt" && provider != "waffo" && provider != "waffo_pancake" {
+			provider = "epay"
+		}
+		if migratedProviders[provider] {
+			return true
+		}
+		switch provider {
+		case "epay":
+			return !isEpayTopUpEnabled()
+		case "stripe":
+			return !isStripeTopUpEnabled()
+		case "bepusdt":
+			return !enableBepusdt
+		case "waffo":
+			return !enableWaffo
+		case "waffo_pancake":
+			return !enableWaffoPancake
+		}
+		return false
+	})
+	payMethods = append(channelMethods, payMethods...)
 	data := gin.H{
+		"wallet_payment_methods_available": len(payMethods) > 0 || enableWaffo || enableWaffoPancake,
 		"enable_bepusdt_topup":             enableBepusdt,
 		"bepusdt_unit_price":               bepusdtPrice,
 		"bepusdt_min_topup":                bepusdtMin,
@@ -140,15 +171,21 @@ func GetTopUpInfo(c *gin.Context) {
 			}
 			return nil
 		}(),
-		"creem_products":          setting.CreemProducts,
-		"pay_methods":             payMethods,
-		"min_topup":               operation_setting.MinTopUp,
-		"stripe_min_topup":        setting.StripeMinTopUp,
-		"waffo_min_topup":         setting.WaffoMinTopUp,
-		"waffo_pancake_min_topup": setting.WaffoPancakeMinTopUp,
-		"amount_options":          operation_setting.GetPaymentSetting().AmountOptions,
-		"discount":                operation_setting.GetPaymentSetting().AmountDiscount,
-		"topup_link":              common.TopUpLink,
+		"creem_products": func() string {
+			if migratedProviders["creem"] {
+				return "[]"
+			}
+			return setting.CreemProducts
+		}(),
+		"pay_methods":              payMethods,
+		"subscription_pay_methods": subscriptionPayMethods,
+		"min_topup":                operation_setting.MinTopUp,
+		"stripe_min_topup":         setting.StripeMinTopUp,
+		"waffo_min_topup":          setting.WaffoMinTopUp,
+		"waffo_pancake_min_topup":  setting.WaffoPancakeMinTopUp,
+		"amount_options":           operation_setting.GetPaymentSetting().AmountOptions,
+		"discount":                 operation_setting.GetPaymentSetting().AmountDiscount,
+		"topup_link":               common.TopUpLink,
 	}
 	common.ApiSuccess(c, data)
 }
@@ -574,6 +611,10 @@ func GetUserTopUps(c *gin.Context) {
 	}
 
 	pageInfo.SetTotal(int(total))
+	if err := model.AttachPaymentChannelDetails(topups); err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	pageInfo.SetItems(topups)
 	common.ApiSuccess(c, pageInfo)
 }
@@ -599,6 +640,10 @@ func GetAllTopUps(c *gin.Context) {
 	}
 
 	pageInfo.SetTotal(int(total))
+	if err := model.AttachPaymentChannelDetails(topups); err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	pageInfo.SetItems(topups)
 	common.ApiSuccess(c, pageInfo)
 }

@@ -18,26 +18,29 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, test } from 'vitest'
 
-import { convertDetectedLanguage } from './languages'
+import {
+  convertDetectedLanguage,
+  INTERFACE_LANGUAGE_OPTIONS,
+  normalizeInterfaceLanguage,
+  toIntlLocale,
+} from './languages'
 
-describe('convertDetectedLanguage', () => {
-  test('maps browser BCP-47 Chinese tags onto interface codes', () => {
-    expect(convertDetectedLanguage('zh-TW')).toBe('zhTW')
-    expect(convertDetectedLanguage('zh-HK')).toBe('zhTW')
-    expect(convertDetectedLanguage('zh-MO')).toBe('zhTW')
-    expect(convertDetectedLanguage('zh-Hant-TW')).toBe('zhTW')
-    expect(convertDetectedLanguage('zh')).toBe('zhCN')
-    expect(convertDetectedLanguage('zh-CN')).toBe('zhCN')
-    expect(convertDetectedLanguage('zh-Hans')).toBe('zhCN')
+describe('interface languages', () => {
+  test('offers English and Simplified Chinese only', () => {
+    expect(INTERFACE_LANGUAGE_OPTIONS.map((option) => option.code)).toEqual([
+      'zhCN',
+      'en',
+    ])
   })
 
-  test('keeps already-normalized interface codes stable (localStorage round-trip)', () => {
-    // i18next caches `zhTW`/`zhCN` (the supportedLngs codes) to localStorage,
-    // and the detector runs this converter on the cached value at every page
-    // load — if `zhTW` does not survive the round-trip, a user who picked
-    // Traditional Chinese is flipped to Simplified on the next load and the
-    // cache is overwritten, making the flip permanent.
-    expect(convertDetectedLanguage('zhTW')).toBe('zhTW')
+  test('maps every Chinese tag onto zhCN', () => {
+    expect(convertDetectedLanguage('zh-TW')).toBe('zhCN')
+    expect(convertDetectedLanguage('zh-HK')).toBe('zhCN')
+    expect(convertDetectedLanguage('zh-Hant-TW')).toBe('zhCN')
+    expect(convertDetectedLanguage('zh')).toBe('zhCN')
+    expect(convertDetectedLanguage('zh-CN')).toBe('zhCN')
+    // Saved by older versions that still shipped Traditional Chinese.
+    expect(convertDetectedLanguage('zhTW')).toBe('zhCN')
     expect(convertDetectedLanguage('zhCN')).toBe('zhCN')
   })
 
@@ -45,5 +48,21 @@ describe('convertDetectedLanguage', () => {
     expect(convertDetectedLanguage('en')).toBe('en')
     expect(convertDetectedLanguage('fr-FR')).toBe('fr-FR')
     expect(convertDetectedLanguage('ja')).toBe('ja')
+  })
+
+  test('normalizes saved settings and retired languages', () => {
+    expect(normalizeInterfaceLanguage('zhCN')).toBe('zhCN')
+    expect(normalizeInterfaceLanguage('zh-TW')).toBe('zhCN')
+    expect(normalizeInterfaceLanguage('en')).toBe('en')
+    // Languages the project no longer ships fall back to English.
+    expect(normalizeInterfaceLanguage('ja')).toBe('en')
+    expect(normalizeInterfaceLanguage('fr')).toBe('en')
+    expect(normalizeInterfaceLanguage(null)).toBe('en')
+  })
+
+  test('converts interface codes into Intl locales', () => {
+    expect(toIntlLocale('zhCN')).toBe('zh-CN')
+    expect(toIntlLocale('en')).toBe('en')
+    expect(toIntlLocale('')).toBeUndefined()
   })
 })
