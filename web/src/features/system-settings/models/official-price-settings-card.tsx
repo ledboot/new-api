@@ -129,6 +129,8 @@ export function OfficialPriceSettingsCard(props: {
 
   const [search, setSearch] = useState('')
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
 
   useEffect(() => {
     if (!overview.data) return
@@ -145,6 +147,15 @@ export function OfficialPriceSettingsCard(props: {
     if (!term) return rows
     return rows.filter((row) => row.model_name.toLowerCase().includes(term))
   }, [overview.data, search])
+
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const pageItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return items.slice(start, start + pageSize)
+  }, [items, currentPage, pageSize])
+  const rangeStart = items.length === 0 ? 0 : (currentPage - 1) * pageSize + 1
+  const rangeEnd = Math.min(currentPage * pageSize, items.length)
 
   const saveRow = useMutation({
     mutationFn: saveOfficialPrice,
@@ -319,7 +330,10 @@ export function OfficialPriceSettingsCard(props: {
 
       <Input
         value={search}
-        onChange={(event) => setSearch(event.target.value)}
+        onChange={(event) => {
+          setSearch(event.target.value)
+          setPage(1)
+        }}
         placeholder={t('Search models')}
         className='sm:max-w-xs'
         aria-label={t('Search models')}
@@ -355,7 +369,7 @@ export function OfficialPriceSettingsCard(props: {
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => {
+            {pageItems.map((item) => {
               const draft = drafts[item.model_name] ?? toDraft(item)
               const original = toDraft(item)
               const dirty = (Object.keys(original) as (keyof Draft)[]).some(
@@ -485,6 +499,63 @@ export function OfficialPriceSettingsCard(props: {
         <p className='text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm'>
           {t('No models match this filter.')}
         </p>
+      )}
+
+      {items.length > 0 && (
+        <div className='flex flex-wrap items-center justify-between gap-3 text-xs'>
+          <div className='flex items-center gap-2'>
+            <span className='text-muted-foreground'>
+              {t('Showing {{from}}-{{to}} of {{total}}', {
+                from: rangeStart,
+                to: rangeEnd,
+                total: items.length,
+              })}
+            </span>
+            <label className='text-muted-foreground flex items-center gap-1'>
+              {t('Rows per page')}
+              <select
+                aria-label={t('Rows per page')}
+                className='border-input bg-background h-7 rounded-md border px-1.5'
+                value={pageSize}
+                onChange={(event) => {
+                  setPageSize(Number(event.target.value))
+                  setPage(1)
+                }}
+              >
+                {[20, 50, 100].map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className='flex items-center gap-2'>
+            <Button
+              type='button'
+              variant='outline'
+              size='sm'
+              disabled={currentPage <= 1}
+              onClick={() => setPage((previous) => Math.max(1, previous - 1))}
+            >
+              {t('Previous page')}
+            </Button>
+            <span className='text-muted-foreground tabular-nums'>
+              {currentPage} / {pageCount}
+            </span>
+            <Button
+              type='button'
+              variant='outline'
+              size='sm'
+              disabled={currentPage >= pageCount}
+              onClick={() =>
+                setPage((previous) => Math.min(pageCount, previous + 1))
+              }
+            >
+              {t('Next page')}
+            </Button>
+          </div>
+        </div>
       )}
     </SettingsSection>
   )

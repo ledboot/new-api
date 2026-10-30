@@ -7626,6 +7626,7 @@
     "Savings": "Savings",
     "Cache read": "Cache read",
     "Cache write (5m)": "Cache write (5m)",
-    "Cache write (1h)": "Cache write (1h)"
+    "Cache write (1h)": "Cache write (1h)",
+    "Showing {{from}}-{{to}} of {{total}}": "Showing {{from}}-{{to}} of {{total}}"
   }
 }

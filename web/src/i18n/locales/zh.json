@@ -7626,6 +7626,7 @@
     "Savings": "节省幅度",
     "Cache read": "缓存读取",
     "Cache write (5m)": "缓存写入 (5m)",
-    "Cache write (1h)": "缓存写入 (1h)"
+    "Cache write (1h)": "缓存写入 (1h)",
+    "Showing {{from}}-{{to}} of {{total}}": "显示 {{from}}-{{to}} / 共 {{total}} 个"
   }
 }

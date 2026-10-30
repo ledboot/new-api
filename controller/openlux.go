@@ -274,6 +274,25 @@ func openLuxImageEndpoints(endpoints []string) map[string]common.EndpointInfo {
 	return result
 }
 
+// openLuxVideoEndpoints maps verified OpenAI video aliases onto the local
+// /v1/videos route. Video prices are billed per request, like the upstream
+// catalog quotes them (typically one 8-second clip).
+func openLuxVideoEndpoints(endpoints []string) map[string]common.EndpointInfo {
+	if len(endpoints) == 0 {
+		return nil
+	}
+	result := map[string]common.EndpointInfo{}
+	for _, endpoint := range endpoints {
+		switch endpoint {
+		case "OpenAI video format", "openai-video", "video-generation", "OpenAI video":
+			result["openai-video"] = common.EndpointInfo{Path: "/v1/videos", Method: "POST"}
+		default:
+			return nil
+		}
+	}
+	return result
+}
+
 // openLuxPriceExpression freezes supported text/image contracts as USD prices.
 // Token image prices do not multiply by quantity; fixed image prices do.
 func openLuxPriceExpression(item openLuxModel, unit, groupRatio, markup float64) (string, error) {
@@ -298,6 +317,23 @@ func openLuxPriceExpression(item openLuxModel, unit, groupRatio, markup float64)
 			return "", common.NewMessage("The upstream price is outside the supported range")
 		}
 		expression := "tier(\"image\", fixed(" + strconv.FormatFloat(price, 'g', -1, 64) + ")) * image_count"
+		if err := billing_setting.SmokeTestExpr(expression); err != nil {
+			return "", err
+		}
+		return expression, nil
+	}
+	videoEndpoints := openLuxVideoEndpoints(item.Endpoints)
+	if item.QuotaType != nil && *item.QuotaType == 1 && videoEndpoints != nil {
+		if item.Price == nil || *item.Price < 0 || math.IsNaN(*item.Price) || math.IsInf(*item.Price, 0) || len(item.Steps) != 0 ||
+			item.Image != nil || item.ImageCache != nil || item.Cache != nil || item.CacheCreation != nil ||
+			item.Cache5m != nil || item.Cache1h != nil {
+			return "", common.NewMessage("The upstream video price is incomplete or unsupported")
+		}
+		price := *item.Price * groupRatio * markup
+		if math.IsNaN(price) || math.IsInf(price, 0) || (*item.Price > 0 && groupRatio > 0 && price == 0) {
+			return "", common.NewMessage("The upstream price is outside the supported range")
+		}
+		expression := "tier(\"request\", fixed(" + strconv.FormatFloat(price, 'g', -1, 64) + "))"
 		if err := billing_setting.SmokeTestExpr(expression); err != nil {
 			return "", err
 		}
@@ -589,6 +625,12 @@ func openLuxMetadataFromCatalog(catalog *openLuxCatalog, locale string) (metadat
 		// routing configuration. Do not copy unverified paths into model endpoints.
 		values := model.MetadataValues{Description: description, Icon: item.Icon, Tags: strings.Join(tags, ","), Vendor: byID[item.VendorID].Name, Status: 1}
 		if endpoints := openLuxImageEndpoints(item.Endpoints); endpoints != nil {
+			encoded, err := common.Marshal(endpoints)
+			if err != nil {
+				return source, nil, nil, err
+			}
+			values.Endpoints = string(encoded)
+		} else if endpoints := openLuxVideoEndpoints(item.Endpoints); endpoints != nil {
 			encoded, err := common.Marshal(endpoints)
 			if err != nil {
 				return source, nil, nil, err
