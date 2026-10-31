@@ -34,23 +34,61 @@ var officialPriceHTTPClient = &http.Client{Timeout: 45 * time.Second}
 
 // Primary vendors only: aggregator or reseller rows must not redefine the list
 // price of a model. Lower rank wins when the same model appears twice.
+// Every provider has a distinct rank: equal ranks would let map iteration order
+// decide the winner, so the imported price could change between runs.
 var officialPriceProviderRank = map[string]int{
 	// First-party vendor entries are the true list price.
 	"openai":           1,
-	"anthropic":        1,
-	"gemini":           1,
-	"deepseek":         1,
-	"xai":              1,
-	"zai":              1,
-	"bigmodel":         1,
-	"dashscope":        1,
-	"qwen_ai_platform": 1,
-	"qwencloud":        1,
-	"moonshot":         1,
-	"minimax":          1,
-	"vertex_ai":        2,
-	"mistral":          3,
-	"cohere":           3,
+	"anthropic":        2,
+	"gemini":           3,
+	"deepseek":         4,
+	"xai":              5,
+	"zai":              6,
+	"bigmodel":         7,
+	"dashscope":        8,
+	"qwencloud":        9,
+	"qwen_ai_platform": 10,
+	"moonshot":         11,
+	"minimax":          12,
+	"vertex_ai":        20,
+	"mistral":          30,
+	"cohere":           31,
+}
+
+// officialPriceFamilyOwner maps a model family to the vendor that publishes its
+// list price. The same model is often resold by other platforms (Alibaba hosts
+// DeepSeek, Z.ai mirrors GLM); those rows must not override the original price.
+var officialPriceFamilyOwner = []struct {
+	prefix   string
+	provider string
+}{
+	{"deepseek", "deepseek"},
+	{"glm", "zai"},
+	{"chatglm", "zai"},
+	{"qwen", "dashscope"},
+	{"qwq", "dashscope"},
+	{"kimi", "moonshot"},
+	{"minimax", "minimax"},
+	{"claude", "anthropic"},
+	{"gpt", "openai"},
+	{"grok", "xai"},
+	{"gemini", "gemini"},
+}
+
+// officialPriceScore ranks an entry for one model key. A family owner always
+// beats a reseller of the same model, then the provider rank breaks the tie.
+func officialPriceScore(provider, key string) int {
+	score := officialPriceProviderRank[provider]
+	for _, family := range officialPriceFamilyOwner {
+		if !strings.HasPrefix(key, family.prefix) {
+			continue
+		}
+		if provider == family.provider {
+			return score - 100
+		}
+		break
+	}
+	return score
 }
 
 type officialPriceIndex struct {
@@ -101,19 +139,19 @@ func buildOfficialPriceIndex(entries map[string]liteLLMPrice) officialPriceIndex
 		rank:   map[string]int{},
 	}
 	for rawName, entry := range entries {
-		priority, ok := officialPriceProviderRank[entry.LiteLLMProvider]
-		if !ok {
+		if _, ok := officialPriceProviderRank[entry.LiteLLMProvider]; !ok {
 			continue
 		}
 		key := normalizeModelKey(rawName)
 		if key == "" {
 			continue
 		}
-		if current, exists := index.rank[key]; exists && current <= priority {
+		score := officialPriceScore(entry.LiteLLMProvider, key)
+		if current, exists := index.rank[key]; exists && current <= score {
 			continue
 		}
 		index.prices[key] = entry
-		index.rank[key] = priority
+		index.rank[key] = score
 	}
 	return index
 }

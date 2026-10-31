@@ -103,3 +103,47 @@ func TestOpenRouterRejectsEmptyCatalog(t *testing.T) {
 	_, err := parseOpenRouterPrices([]byte(`{"data":[]}`))
 	require.Error(t, err)
 }
+
+// A reseller listing the same model must not override the vendor that owns it,
+// even when both providers are allowed and map iteration order is random.
+func TestBuildOfficialPriceIndexPrefersFamilyOwner(t *testing.T) {
+	entries := map[string]liteLLMPrice{
+		"deepseek-v4-pro":           {InputCostPerToken: 0.00000132, OutputCostPerToken: 0.00000396, LiteLLMProvider: "deepseek"},
+		"dashscope/deepseek-v4-pro": {InputCostPerToken: 0.0000024, OutputCostPerToken: 0.0000048, LiteLLMProvider: "dashscope"},
+		"qwencloud/deepseek-v4-pro": {InputCostPerToken: 0.0000024, OutputCostPerToken: 0.0000048, LiteLLMProvider: "qwencloud"},
+		"zai/glm-5.3":               {InputCostPerToken: 0.0000014, OutputCostPerToken: 0.0000044, LiteLLMProvider: "zai"},
+		"bigmodel/glm-5.3":          {InputCostPerToken: 0.00000114, OutputCostPerToken: 0.000004, LiteLLMProvider: "bigmodel"},
+	}
+
+	for attempt := 0; attempt < 50; attempt++ {
+		index := buildOfficialPriceIndex(entries)
+
+		entry, ok := index.lookup("deepseek-v4-pro")
+		require.True(t, ok)
+		assert.Equal(t, "deepseek", entry.LiteLLMProvider)
+		assert.InDelta(t, 0.00000132, entry.InputCostPerToken, 1e-12)
+
+		entry, ok = index.lookup("glm-5.3")
+		require.True(t, ok)
+		assert.Equal(t, "zai", entry.LiteLLMProvider)
+	}
+
+	// The owner still wins when only the reseller row is present.
+	onlyReseller := map[string]liteLLMPrice{
+		"dashscope/deepseek-v4-pro": {InputCostPerToken: 0.0000024, LiteLLMProvider: "dashscope"},
+	}
+	entry, ok := buildOfficialPriceIndex(onlyReseller).lookup("deepseek-v4-pro")
+	require.True(t, ok)
+	assert.Equal(t, "dashscope", entry.LiteLLMProvider)
+}
+
+// Every provider in the allowlist must rank differently; equal ranks would make
+// the imported price depend on Go map iteration order.
+func TestOfficialPriceProviderRanksAreUnique(t *testing.T) {
+	seen := map[int]string{}
+	for provider, rank := range officialPriceProviderRank {
+		other, exists := seen[rank]
+		require.False(t, exists, "providers %s and %s share rank %d", provider, other, rank)
+		seen[rank] = provider
+	}
+}
