@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -39,6 +40,76 @@ var openLuxSalesMu sync.Mutex
 var ErrOpenLuxSalesGroupConflict = errors.New("A local group or channel already uses a selected OpenLux group name")
 
 var ErrOpenLuxSalesConflict = errors.New("OpenLux sales configuration changed; preview again")
+
+// openLuxLegacyTierLabel matches the historical provider-named tier label
+// (tier("openlux_1", ...)) that OpenLux price generation used to emit. It is
+// applied to the decoded expression string, where the quotes are unescaped.
+var openLuxLegacyTierLabel = regexp.MustCompile(`tier\("openlux_(\d+)"`)
+
+// neutralOpenLuxTierLabel rewrites a matched legacy label to a provider-free name.
+func neutralOpenLuxTierLabel(expression string) string {
+	return openLuxLegacyTierLabel.ReplaceAllString(expression, `tier("tier_$1"`)
+}
+
+// MigrateOpenLuxTierLabels rewrites stored OpenLux sale expressions so their
+// tier labels stop naming the upstream provider. Tier labels are display-only
+// and appear in user-visible consume logs ("Matched Tier"), so republishing an
+// older contract would otherwise reintroduce the vendor name into model pricing.
+// The rewrite parses and re-validates the stored contract and is idempotent;
+// expressions that already use the neutral label are untouched.
+func MigrateOpenLuxTierLabels(db *gorm.DB) error {
+	if db == nil {
+		return fmt.Errorf("migrate OpenLux tier labels: database is nil")
+	}
+	if !db.Migrator().HasTable(&Option{}) {
+		return nil
+	}
+	var option Option
+	err := db.Where(commonKeyCol+" = ?", billing_setting.OpenLuxSalesOption).First(&option).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("load OpenLux sales configuration: %w", err)
+	}
+	sales, err := billing_setting.ParseOpenLuxSales(option.Value)
+	if err != nil {
+		return fmt.Errorf("parse OpenLux sales configuration: %w", err)
+	}
+	changed := false
+	for group, sale := range sales {
+		for name, price := range sale.Models {
+			neutralCost := neutralOpenLuxTierLabel(price.Cost)
+			neutralExpression := neutralOpenLuxTierLabel(price.Expression)
+			if neutralCost == price.Cost && neutralExpression == price.Expression {
+				continue
+			}
+			price.Cost = neutralCost
+			price.Expression = neutralExpression
+			sale.Models[name] = price
+			changed = true
+		}
+		sales[group] = sale
+	}
+	if !changed {
+		return nil
+	}
+	encoded, err := common.Marshal(sales)
+	if err != nil {
+		return fmt.Errorf("encode OpenLux sales configuration: %w", err)
+	}
+	// Only commit a value that still parses and smoke-tests, so the stored
+	// selling contract cannot be broken by the rewrite.
+	if _, err := billing_setting.ParseOpenLuxSales(string(encoded)); err != nil {
+		return fmt.Errorf("validate rewritten OpenLux sales configuration: %w", err)
+	}
+	if err := db.Model(&Option{}).Where(commonKeyCol+" = ?", billing_setting.OpenLuxSalesOption).
+		Update("value", string(encoded)).Error; err != nil {
+		return fmt.Errorf("update OpenLux sales configuration: %w", err)
+	}
+	common.SysLog(common.LogText("rewrote the OpenLux sales tier labels to a provider-neutral name"))
+	return nil
+}
 
 func openLuxSalesOptions(tx *gorm.DB, lock bool) (map[string]string, error) {
 	defaults := map[string]string{billing_setting.OpenLuxSalesOption: "{}", "GroupRatio": ratio_setting.GroupRatio2JSONString(), "TopupGroupRatio": common.TopupGroupRatio2JSONString(), "GroupGroupRatio": ratio_setting.GroupGroupRatio2JSONString(), "UserUsableGroups": setting.UserUsableGroups2JSONString()}

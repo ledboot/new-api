@@ -40,8 +40,8 @@ const published = {
       source_version: 'saved',
       models: {
         'claude-opus-5': {
-          cost: 'tier("openlux_1", p * 0.4412 + c * 2.206 + cr * 0.04412)',
-          expression: 'tier("openlux_1", p * 6 + c * 30 + cr * 0.6)',
+          cost: 'tier("tier_1", p * 0.4412 + c * 2.206 + cr * 0.04412)',
+          expression: 'tier("tier_1", p * 6 + c * 30 + cr * 0.6)',
         },
       },
     },
@@ -60,7 +60,7 @@ const published = {
   group_ratios: { 'Kiro-Claude-1': 0.11, 'Image-Free': 0 },
   effective_prices: {
     'Kiro-Claude-1': {
-      'claude-opus-5': 'tier("openlux_1", p * 0.66 + c * 3.3 + cr * 0.066)',
+      'claude-opus-5': 'tier("tier_1", p * 0.66 + c * 3.3 + cr * 0.066)',
     },
     'Image-Free': { 'gpt-image-2-c': 'tier("image", fixed(0)) * image_count' },
   },
@@ -157,9 +157,9 @@ it('shows an empty state when no sales were published', async () => {
 
 it('keeps source context bounds and supports selecting a single group', async () => {
   const price = {
-    cost: 'len <= 100000 ? tier("openlux_1", p * 1) : tier("openlux_2", p * 5)',
+    cost: 'len <= 100000 ? tier("tier_1", p * 1) : tier("tier_2", p * 5)',
     expression:
-      'len <= 100000 ? tier("openlux_1", p * 6) : tier("openlux_2", p * 30)',
+      'len <= 100000 ? tier("tier_1", p * 6) : tier("tier_2", p * 30)',
     input_token_limit: 1000000,
   }
   vi.spyOn(api, 'get').mockResolvedValue({
@@ -218,8 +218,8 @@ it('paginates published models and resets the page when searching', async () => 
     Array.from({ length: 21 }, (_, i) => [
       `model-${String(i).padStart(2, '0')}`,
       {
-        cost: 'tier("openlux_1", p * 1)',
-        expression: 'tier("openlux_1", p * 2 + c * 4)',
+        cost: 'tier("tier_1", p * 1)',
+        expression: 'tier("tier_1", p * 2 + c * 4)',
       },
     ])
   )

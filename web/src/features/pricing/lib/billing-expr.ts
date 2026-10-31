@@ -300,7 +300,7 @@ export function formatOpenLuxTierRange(
   unlimitedLabel: string,
   inputTokenLimit?: number
 ): string | null {
-  if (!/^openlux_\d+$/.test(tier.label) || tier.conditionText) return null
+  if (!/^tier_\d+$/.test(tier.label) || tier.conditionText) return null
   const index = tiers.indexOf(tier)
   if (index < 0) return null
   const conditions = [...tier.conditions]

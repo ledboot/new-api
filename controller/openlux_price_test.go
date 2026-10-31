@@ -61,3 +61,26 @@ func TestOpenLuxVideoEndpointsMapToTheLocalVideoRoute(t *testing.T) {
 	assert.Nil(t, openLuxVideoEndpoints([]string{"openai"}))
 	assert.Nil(t, openLuxVideoEndpoints([]string{"OpenAI video format", "openai"}))
 }
+
+// The generated tier labels reach user-visible consume logs ("Matched Tier"),
+// so the expression must never name the upstream source.
+func TestOpenLuxTokenPriceExpressionKeepsTierLabelsNeutral(t *testing.T) {
+	model := openLuxModel{
+		Name:       "claude-opus-5",
+		QuotaType:  intPtr(0),
+		Ratio:      floatPtr(2),
+		Completion: floatPtr(10),
+		Endpoints:  []string{"anthropic"},
+		Steps: []openLuxStep{
+			{Size: 100000, Prompt: floatPtr(1), Completion: floatPtr(1), Cache: floatPtr(1)},
+			{Size: 1000000, Prompt: floatPtr(5), Completion: floatPtr(5), Cache: floatPtr(5)},
+		},
+	}
+	expression, err := openLuxPriceExpression(model, 2, 1, 1)
+	require.NoError(t, err)
+
+	assert.NotContains(t, expression, "openlux")
+	assert.NotContains(t, expression, "OpenLux")
+	assert.Contains(t, expression, `tier("tier_1"`)
+	assert.Contains(t, expression, `tier("tier_2"`)
+}

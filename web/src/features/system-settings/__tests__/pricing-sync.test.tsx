@@ -1197,7 +1197,7 @@ it('disables both batch shortcuts when the configured exchange rate becomes inva
 })
 
 it('requires a verified OpenLux unit and fixed group, previews cost separately and publishes only after confirmation', async () => {
-  const sale = 'tier("openlux_1", p * 1.2 + c * 6 + cr * 0.12)'
+  const sale = 'tier("tier_1", p * 1.2 + c * 6 + cr * 0.12)'
   const sourceName = 'OpenLux channel · OpenLux paid × 1.2(7)'
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
     if (url === '/api/ratio_sync/channels') {
@@ -1272,7 +1272,7 @@ it('requires a verified OpenLux unit and fixed group, previews cost separately a
                   fetched_at: 1,
                   costs: {
                     'openlux-text':
-                      'tier("openlux_1", p * 1 + c * 5 + cr * 0.1)',
+                      'tier("tier_1", p * 1 + c * 5 + cr * 0.1)',
                   },
                   excluded: {
                     'video-model':

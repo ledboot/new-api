@@ -771,7 +771,7 @@ it('shows OpenLux input token intervals instead of generated tier identifiers', 
           billing_mode: 'tiered_expr',
           billing_usage_schema: undefined,
           billing_expr:
-            'len <= 100000 ? tier("openlux_1", p * 1 + c * 5) : len <= 1000000 ? tier("openlux_2", p * 5 + c * 25) : tier("openlux_3", p * 10 + c * 50)',
+            'len <= 100000 ? tier("tier_1", p * 1 + c * 5) : len <= 1000000 ? tier("tier_2", p * 5 + c * 25) : tier("tier_3", p * 10 + c * 50)',
         }}
         groupRatio={{ default: 1 }}
         usableGroup={{ default: { desc: '', ratio: 1 } }}
@@ -788,14 +788,14 @@ it('shows OpenLux input token intervals instead of generated tier identifiers', 
   expect(screen.getAllByText('[0, 100000]').length).toBeGreaterThan(0)
   expect(screen.getAllByText('(100000, 1000000]').length).toBeGreaterThan(0)
   expect(screen.getAllByText('(1000000, ∞)').length).toBeGreaterThan(0)
-  expect(screen.queryByText('openlux_1')).not.toBeInTheDocument()
-  expect(screen.queryByText('openlux_2')).not.toBeInTheDocument()
-  expect(screen.queryByText('openlux_3')).not.toBeInTheDocument()
+  expect(screen.queryByText('tier_1')).not.toBeInTheDocument()
+  expect(screen.queryByText('tier_2')).not.toBeInTheDocument()
+  expect(screen.queryByText('tier_3')).not.toBeInTheDocument()
 })
 
 it('uses the unlimited translation for an OpenLux tier without token bounds', () => {
   render(
-    <DynamicPricingBreakdown billingExpr='tier("openlux_1", p * 1 + c * 5)' />
+    <DynamicPricingBreakdown billingExpr='tier("tier_1", p * 1 + c * 5)' />
   )
   expect(screen.getAllByText('No range limit').length).toBeGreaterThan(0)
   expect(zhLocale.translation['No range limit']).toBe('不限')
@@ -811,7 +811,7 @@ it('keeps the published OpenLux upper input limit separate for each group', () =
   })
   clients.push(client)
   const expression =
-    'len <= 100000 ? tier("openlux_1", p * 1 + c * 5) : tier("openlux_2", p * 5 + c * 25)'
+    'len <= 100000 ? tier("tier_1", p * 1 + c * 5) : tier("tier_2", p * 5 + c * 25)'
   render(
     <QueryClientProvider client={client}>
       <ModelDetailsContent
@@ -880,10 +880,10 @@ it('sorts model detail groups by numeric input price after group multipliers, in
           billing_usage_schema: undefined,
           enable_groups: ['expensive', 'cheap', 'discount', 'free'],
           group_billing_expr: {
-            expensive: 'tier("openlux_1", p * 9 + c * 10)',
-            cheap: 'tier("openlux_1", p * 2 + c * 100)',
-            discount: 'tier("openlux_1", p * 9 + c * 20)',
-            free: 'tier("openlux_1", p * 5 + c * 30)',
+            expensive: 'tier("tier_1", p * 9 + c * 10)',
+            cheap: 'tier("tier_1", p * 2 + c * 100)',
+            discount: 'tier("tier_1", p * 9 + c * 20)',
+            free: 'tier("tier_1", p * 5 + c * 30)',
           },
         }}
         groupRatio={{ expensive: 1, cheap: 1, discount: 0.1, free: 0 }}
@@ -967,7 +967,7 @@ it('renders only group pricing and inline API endpoint rows without overview tab
         model={{
           ...model,
           billing_usage_schema: undefined,
-          billing_expr: 'tier("openlux_1", p * 1 + c * 5)',
+          billing_expr: 'tier("tier_1", p * 1 + c * 5)',
           supported_endpoint_types: ['openai', 'unknown'],
         }}
         groupRatio={{ default: 1 }}

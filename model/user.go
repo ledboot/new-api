@@ -233,11 +233,14 @@ func generateDefaultSidebarConfigForRole(userRole int) string {
 	}
 
 	// 控制台区域 - 所有用户都可以访问
+	// 审计日志仅对管理角色可见：普通用户默认隐藏该菜单入口。
+	isAdminRole := userRole == common.RoleAdminUser || userRole == common.RoleRootUser
 	defaultConfig["console"] = map[string]any{
 		"enabled":    true,
 		"detail":     true,
 		"token":      true,
 		"log":        true,
+		"audit":      isAdminRole,
 		"midjourney": true,
 		"task":       true,
 	}
@@ -281,6 +284,77 @@ func generateDefaultSidebarConfigForRole(userRole int) string {
 	}
 
 	return string(configBytes)
+}
+
+// migrateSidebarAuditMenuVisibility hides the Audit Logs console entry for
+// existing non-admin users. Users created after this change get the flag from
+// generateDefaultSidebarConfigForRole; users stored before it keep a config
+// without the "audit" key, which the console reads as visible. Only the missing
+// key is filled in: an explicit value (including a granted true) is preserved,
+// and admin/root users keep full access. The rewrite is idempotent because a
+// config that already carries "audit" is skipped.
+func migrateSidebarAuditMenuVisibility(db *gorm.DB) error {
+	if db == nil {
+		return fmt.Errorf("migrate sidebar audit visibility: database is nil")
+	}
+	if !db.Migrator().HasTable(&User{}) {
+		return nil
+	}
+
+	var users []User
+	if err := db.Select("id", "role", "setting").
+		Where("role IN ?", []int{common.RoleGuestUser, common.RoleCommonUser}).
+		Find(&users).Error; err != nil {
+		return fmt.Errorf("load users for sidebar audit migration: %w", err)
+	}
+
+	migrated := 0
+	for _, user := range users {
+		setting := user.GetSetting()
+		modules := map[string]any{}
+		if strings.TrimSpace(setting.SidebarModules) != "" {
+			if err := common.Unmarshal([]byte(setting.SidebarModules), &modules); err != nil {
+				// A malformed value is treated by the console as "do not narrow",
+				// so leaving it untouched keeps the historical view intact.
+				continue
+			}
+		}
+		if modules == nil {
+			modules = map[string]any{}
+		}
+
+		console, ok := modules["console"].(map[string]any)
+		if ok {
+			if _, hasAudit := console["audit"]; hasAudit {
+				continue
+			}
+		} else {
+			// No console override yet: seed one so the audit entry stays hidden
+			// without narrowing any other console module.
+			console = map[string]any{}
+			modules["console"] = console
+		}
+		console["audit"] = false
+
+		encoded, err := common.Marshal(modules)
+		if err != nil {
+			return fmt.Errorf("encode sidebar config for user %d: %w", user.Id, err)
+		}
+		setting.SidebarModules = string(encoded)
+		settingBytes, err := common.Marshal(setting)
+		if err != nil {
+			return fmt.Errorf("encode setting for user %d: %w", user.Id, err)
+		}
+		if err := db.Model(&User{}).Where("id = ?", user.Id).Update("setting", string(settingBytes)).Error; err != nil {
+			return fmt.Errorf("update sidebar config for user %d: %w", user.Id, err)
+		}
+		migrated++
+	}
+
+	if migrated > 0 {
+		common.SysLog(common.LogText("hid the audit log menu for %d existing non-admin users", migrated))
+	}
+	return nil
 }
 
 // CheckUserExistOrDeleted check if user exist or deleted, if not exist, return false, nil, if deleted or exist, return true, nil

@@ -445,7 +445,9 @@ func openLuxPriceExpression(item openLuxModel, unit, groupRatio, markup float64)
 			}
 			terms = append(terms, term.name+" * "+strconv.FormatFloat(price, 'g', -1, 64))
 		}
-		leaves[i] = fmt.Sprintf("tier(\"openlux_%d\", %s)", i+1, strings.Join(terms, " + "))
+		// Tier labels surface in user-visible consume logs ("Matched Tier"), so
+		// they must stay provider-neutral and never name the upstream source.
+		leaves[i] = fmt.Sprintf("tier(\"tier_%d\", %s)", i+1, strings.Join(terms, " + "))
 	}
 	expression := leaves[len(leaves)-1]
 	for i := len(leaves) - 2; i >= 0; i-- {
