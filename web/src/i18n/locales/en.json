@@ -7627,6 +7627,9 @@
     "Cache read": "Cache read",
     "Cache write (5m)": "Cache write (5m)",
     "Cache write (1h)": "Cache write (1h)",
-    "Showing {{from}}-{{to}} of {{total}}": "Showing {{from}}-{{to}} of {{total}}"
+    "Showing {{from}}-{{to}} of {{total}}": "Showing {{from}}-{{to}} of {{total}}",
+    "Use OpenRouter for unmatched models": "Use OpenRouter for unmatched models",
+    "GLM, Qwen and DeepSeek models are often listed under third-party hosts upstream. OpenRouter publishes them directly and is only used for models the primary source misses.": "GLM, Qwen and DeepSeek models are often listed under third-party hosts upstream. OpenRouter publishes them directly and is only used for models the primary source misses.",
+    "OpenRouter models URL": "OpenRouter models URL"
   }
 }

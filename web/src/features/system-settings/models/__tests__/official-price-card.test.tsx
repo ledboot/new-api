@@ -98,6 +98,8 @@ test('lists official prices with their source and filters by name', async () => 
           enabled: true,
           intervalHours: 24,
           sourceUrl: 'https://example.com/prices.json',
+          openRouterEnabled: true,
+          openRouterUrl: 'https://openrouter.ai/api/v1/models',
         }}
       />
     )
@@ -125,6 +127,8 @@ test('saves an edited price and resets a synced row', async () => {
           enabled: true,
           intervalHours: 24,
           sourceUrl: 'https://example.com/prices.json',
+          openRouterEnabled: true,
+          openRouterUrl: 'https://openrouter.ai/api/v1/models',
         }}
       />
     )
@@ -161,6 +165,8 @@ test('runs a manual sync from the card', async () => {
           enabled: true,
           intervalHours: 24,
           sourceUrl: 'https://example.com/prices.json',
+          openRouterEnabled: true,
+          openRouterUrl: 'https://openrouter.ai/api/v1/models',
         }}
       />
     )

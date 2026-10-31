@@ -60,6 +60,8 @@ const schema = z.object({
   enabled: z.boolean(),
   intervalHours: z.coerce.number().int().min(1).max(720),
   sourceUrl: z.string().url(),
+  openRouterEnabled: z.boolean(),
+  openRouterUrl: z.string().url(),
 })
 
 type Values = z.input<typeof schema>
@@ -107,7 +109,13 @@ const sourceTone: Record<string, string> = {
 }
 
 export function OfficialPriceSettingsCard(props: {
-  defaultValues: { enabled: boolean; intervalHours: number; sourceUrl: string }
+  defaultValues: {
+    enabled: boolean
+    intervalHours: number
+    sourceUrl: string
+    openRouterEnabled: boolean
+    openRouterUrl: string
+  }
 }) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
@@ -119,6 +127,8 @@ export function OfficialPriceSettingsCard(props: {
       enabled: props.defaultValues.enabled,
       intervalHours: props.defaultValues.intervalHours,
       sourceUrl: props.defaultValues.sourceUrl,
+      openRouterEnabled: props.defaultValues.openRouterEnabled,
+      openRouterUrl: props.defaultValues.openRouterUrl,
     },
   })
 
@@ -210,6 +220,18 @@ export function OfficialPriceSettingsCard(props: {
         value: values.sourceUrl,
       })
     }
+    if (values.openRouterEnabled !== props.defaultValues.openRouterEnabled) {
+      updates.push({
+        key: 'official_price_setting.openrouter_enabled',
+        value: String(values.openRouterEnabled),
+      })
+    }
+    if (values.openRouterUrl !== props.defaultValues.openRouterUrl) {
+      updates.push({
+        key: 'official_price_setting.openrouter_url',
+        value: values.openRouterUrl,
+      })
+    }
     if (updates.length === 0) {
       toast.info(t('No changes to save'))
       return
@@ -298,6 +320,47 @@ export function OfficialPriceSettingsCard(props: {
               )}
             />
           </div>
+          <FormField
+            control={form.control}
+            name='openRouterEnabled'
+            render={({ field }) => (
+              <SettingsSwitchItem>
+                <SettingsSwitchContent>
+                  <FormLabel>
+                    {t('Use OpenRouter for unmatched models')}
+                  </FormLabel>
+                  <FormDescription>
+                    {t(
+                      'GLM, Qwen and DeepSeek models are often listed under third-party hosts upstream. OpenRouter publishes them directly and is only used for models the primary source misses.'
+                    )}
+                  </FormDescription>
+                </SettingsSwitchContent>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </SettingsSwitchItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name='openRouterUrl'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('OpenRouter models URL')}</FormLabel>
+                <FormControl>
+                  <Input
+                    type='url'
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </SettingsForm>
       </Form>
 

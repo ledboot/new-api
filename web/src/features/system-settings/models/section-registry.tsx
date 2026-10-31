@@ -133,6 +133,11 @@ const MODELS_SECTIONS = [
           sourceUrl:
             settings['official_price_setting.source_url'] ||
             'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json',
+          openRouterEnabled:
+            settings['official_price_setting.openrouter_enabled'] ?? true,
+          openRouterUrl:
+            settings['official_price_setting.openrouter_url'] ||
+            'https://openrouter.ai/api/v1/models',
         }}
       />
     ),

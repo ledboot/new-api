@@ -64,3 +64,42 @@ func TestOfficialPriceIndexKeepsCacheCosts(t *testing.T) {
 	assert.InDelta(t, 0.00000375, entry.CacheCreationInputTokenCost, 1e-12)
 	assert.InDelta(t, 0.000006, entry.CacheCreationInputTokenCost1h, 1e-12)
 }
+
+func TestOpenRouterPricesCoverGlmQwenDeepSeek(t *testing.T) {
+	body := []byte(`{"data":[
+		{"id":"deepseek/deepseek-v4.1-flash","pricing":{"prompt":"0.000000045","completion":"0.0000005","input_cache_read":"0.000000006"}},
+		{"id":"z-ai/glm-5.3","pricing":{"prompt":"0.0000000699","completion":"0.0000014"}},
+		{"id":"qwen/qwen3.8-max-0902","pricing":{"prompt":"0.0000002","completion":"0.0000008"}},
+		{"id":"~deepseek/deepseek-v4-flash-latest","pricing":{"prompt":"0.0000001","completion":"0.0000004"}},
+		{"id":"deepseek/deepseek-v4-flash","pricing":{"prompt":"0.0000002","completion":"0.0000006"}}
+	]}`)
+	index, err := parseOpenRouterPrices(body)
+	require.NoError(t, err)
+
+	row, ok := lookupOpenRouter(index, "deepseek-v4.1-flash")
+	require.True(t, ok)
+	assert.InDelta(t, 0.045, row.InputPrice, 1e-9)
+	assert.InDelta(t, 0.5, row.OutputPrice, 1e-9)
+	assert.InDelta(t, 0.006, row.CacheReadPrice, 1e-9)
+
+	row, ok = lookupOpenRouter(index, "glm-5.3")
+	require.True(t, ok)
+	assert.InDelta(t, 0.0699, row.InputPrice, 1e-9)
+
+	// A dated site model still matches, and plain ids beat ":batch"/"~" variants.
+	row, ok = lookupOpenRouter(index, "qwen3.8-max-0902")
+	require.True(t, ok)
+	assert.InDelta(t, 0.2, row.InputPrice, 1e-9)
+
+	row, ok = lookupOpenRouter(index, "deepseek-v4-flash")
+	require.True(t, ok)
+	assert.InDelta(t, 0.2, row.InputPrice, 1e-9)
+
+	_, ok = lookupOpenRouter(index, "zz-unknown-model")
+	assert.False(t, ok)
+}
+
+func TestOpenRouterRejectsEmptyCatalog(t *testing.T) {
+	_, err := parseOpenRouterPrices([]byte(`{"data":[]}`))
+	require.Error(t, err)
+}

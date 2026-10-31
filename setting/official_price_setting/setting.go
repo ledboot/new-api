@@ -13,12 +13,22 @@ type Setting struct {
 	Enabled       bool   `json:"enabled"`
 	IntervalHours int    `json:"interval_hours"`
 	SourceURL     string `json:"source_url"`
+	// OpenRouter covers models the primary table does not carry under a
+	// first-party provider (GLM/Qwen/DeepSeek entries live there). It is used
+	// only as a fallback for models the primary source could not match.
+	OpenRouterEnabled bool   `json:"openrouter_enabled"`
+	OpenRouterURL     string `json:"openrouter_url"`
 }
 
+// DefaultOpenRouterURL is OpenRouter's public model catalog with per-token prices.
+const DefaultOpenRouterURL = "https://openrouter.ai/api/v1/models"
+
 var setting = Setting{
-	Enabled:       true,
-	IntervalHours: 24,
-	SourceURL:     DefaultSourceURL,
+	Enabled:           true,
+	IntervalHours:     24,
+	SourceURL:         DefaultSourceURL,
+	OpenRouterEnabled: true,
+	OpenRouterURL:     DefaultOpenRouterURL,
 }
 
 func init() {

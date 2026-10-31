@@ -7627,6 +7627,9 @@
     "Cache read": "缓存读取",
     "Cache write (5m)": "缓存写入 (5m)",
     "Cache write (1h)": "缓存写入 (1h)",
-    "Showing {{from}}-{{to}} of {{total}}": "显示 {{from}}-{{to}} / 共 {{total}} 个"
+    "Showing {{from}}-{{to}} of {{total}}": "显示 {{from}}-{{to}} / 共 {{total}} 个",
+    "Use OpenRouter for unmatched models": "对未匹配模型使用 OpenRouter",
+    "GLM, Qwen and DeepSeek models are often listed under third-party hosts upstream. OpenRouter publishes them directly and is only used for models the primary source misses.": "GLM、Qwen、DeepSeek 等模型在上游价表里常挂在第三方主机名下，OpenRouter 则直接收录这些模型。该来源只用于主价表没有匹配到的模型。",
+    "OpenRouter models URL": "OpenRouter 模型列表地址"
   }
 }

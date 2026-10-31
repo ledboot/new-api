@@ -70,6 +70,9 @@ const defaultModelSettings: ModelSettings = {
   'official_price_setting.interval_hours': 24,
   'official_price_setting.source_url':
     'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json',
+  'official_price_setting.openrouter_enabled': true,
+  'official_price_setting.openrouter_url':
+    'https://openrouter.ai/api/v1/models',
 }
 
 export function ModelSettings() {

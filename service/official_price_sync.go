@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,14 +35,22 @@ var officialPriceHTTPClient = &http.Client{Timeout: 45 * time.Second}
 // Primary vendors only: aggregator or reseller rows must not redefine the list
 // price of a model. Lower rank wins when the same model appears twice.
 var officialPriceProviderRank = map[string]int{
-	"openai":    1,
-	"anthropic": 1,
-	"gemini":    1,
-	"deepseek":  1,
-	"xai":       1,
-	"vertex_ai": 2,
-	"mistral":   3,
-	"cohere":    3,
+	// First-party vendor entries are the true list price.
+	"openai":           1,
+	"anthropic":        1,
+	"gemini":           1,
+	"deepseek":         1,
+	"xai":              1,
+	"zai":              1,
+	"bigmodel":         1,
+	"dashscope":        1,
+	"qwen_ai_platform": 1,
+	"qwencloud":        1,
+	"moonshot":         1,
+	"minimax":          1,
+	"vertex_ai":        2,
+	"mistral":          3,
+	"cohere":           3,
 }
 
 type officialPriceIndex struct {
@@ -64,7 +74,8 @@ func stripSnapshotDate(name string) string {
 			return name[:index]
 		}
 	}
-	for _, length := range []int{8, 6} {
+	// Vendor snapshots appear as -2024-08-06, -20241022 / -0902 or -1017.
+	for _, length := range []int{8, 6, 4} {
 		if len(name) > length+1 {
 			suffix := name[len(name)-length:]
 			if isDigits(suffix) {
@@ -131,6 +142,106 @@ func parseLiteLLMPrices(body []byte) (map[string]liteLLMPrice, error) {
 	return entries, nil
 }
 
+// OpenRouter publishes per-token prices as decimal strings, e.g.
+// {"prompt":"0.000000045","completion":"0.0000005"}.
+type openRouterModel struct {
+	ID      string `json:"id"`
+	Pricing struct {
+		Prompt          string `json:"prompt"`
+		Completion      string `json:"completion"`
+		InputCacheRead  string `json:"input_cache_read"`
+		InputCacheWrite string `json:"input_cache_write"`
+	} `json:"pricing"`
+}
+
+type openRouterCatalog struct {
+	Data []openRouterModel `json:"data"`
+}
+
+func parseOpenRouterPrices(body []byte) (map[string]openRouterModel, error) {
+	var catalog openRouterCatalog
+	if err := json.Unmarshal(body, &catalog); err != nil {
+		return nil, fmt.Errorf("parse OpenRouter price table: %w", err)
+	}
+	if len(catalog.Data) == 0 {
+		return nil, errors.New("OpenRouter price table is empty")
+	}
+	index := make(map[string]openRouterModel, len(catalog.Data))
+	for _, item := range catalog.Data {
+		key := normalizeOpenRouterKey(item.ID)
+		if key == "" {
+			continue
+		}
+		// Plain ids win over variants ("~vendor/model", ":free", ":batch").
+		if existing, ok := index[key]; ok && openRouterVariantRank(item.ID) >= openRouterVariantRank(existing.ID) {
+			continue
+		}
+		index[key] = item
+	}
+	return index, nil
+}
+
+func normalizeOpenRouterKey(id string) string {
+	key := strings.ToLower(strings.TrimSpace(id))
+	key = strings.TrimPrefix(key, "~")
+	for _, suffix := range []string{":free", ":batch", ":extended", ":thinking", ":online", ":nitro"} {
+		key = strings.TrimSuffix(key, suffix)
+	}
+	if slash := strings.LastIndex(key, "/"); slash >= 0 {
+		key = key[slash+1:]
+	}
+	return key
+}
+
+func openRouterVariantRank(id string) int {
+	rank := 0
+	if strings.HasPrefix(id, "~") {
+		rank += 2
+	}
+	lower := strings.ToLower(id)
+	for _, suffix := range []string{":free", ":batch", ":extended", ":thinking", ":online", ":nitro"} {
+		if strings.HasSuffix(lower, suffix) {
+			rank++
+		}
+	}
+	return rank
+}
+
+func parseOpenRouterPrice(value string) float64 {
+	price, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil || math.IsNaN(price) || math.IsInf(price, 0) || price < 0 {
+		return 0
+	}
+	return roundPrice(price * 1_000_000)
+}
+
+func lookupOpenRouter(index map[string]openRouterModel, modelName string) (model.OfficialPrice, bool) {
+	key := normalizeModelKey(modelName)
+	item, ok := index[key]
+	if !ok {
+		if stripped := stripSnapshotDate(key); stripped != key {
+			item, ok = index[stripped]
+		}
+	}
+	if !ok {
+		return model.OfficialPrice{}, false
+	}
+	input := parseOpenRouterPrice(item.Pricing.Prompt)
+	output := parseOpenRouterPrice(item.Pricing.Completion)
+	cacheRead := parseOpenRouterPrice(item.Pricing.InputCacheRead)
+	cacheWrite := parseOpenRouterPrice(item.Pricing.InputCacheWrite)
+	if input == 0 && output == 0 && cacheRead == 0 && cacheWrite == 0 {
+		return model.OfficialPrice{}, false
+	}
+	return model.OfficialPrice{
+		ModelName:       modelName,
+		InputPrice:      input,
+		OutputPrice:     output,
+		CacheReadPrice:  cacheRead,
+		CacheWritePrice: cacheWrite,
+	}, true
+}
+
 func fetchOfficialPriceTable(ctx context.Context, url string) ([]byte, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -168,7 +279,9 @@ func SyncOfficialPrices(ctx context.Context) (model.OfficialPriceSyncState, erro
 	}
 	index := buildOfficialPriceIndex(entries)
 
+	setting := official_price_setting.GetSetting()
 	rows := make([]model.OfficialPrice, 0, len(entries))
+	matchedModels := map[string]bool{}
 	for _, pricing := range model.GetPricing() {
 		// Task/usage priced models have no comparable per-token list price.
 		if pricing.BillingUsageSchema != nil {
@@ -188,6 +301,7 @@ func SyncOfficialPrices(ctx context.Context) (model.OfficialPriceSyncState, erro
 			state.Skipped++
 			continue
 		}
+		matchedModels[pricing.ModelName] = true
 		rows = append(rows, model.OfficialPrice{
 			ModelName:         pricing.ModelName,
 			InputPrice:        input,
@@ -197,6 +311,37 @@ func SyncOfficialPrices(ctx context.Context) (model.OfficialPriceSyncState, erro
 			CacheWrite1hPrice: cacheWrite1h,
 		})
 	}
+
+	// Fallback: OpenRouter carries GLM/Qwen/DeepSeek families under first-party
+	// ids that the primary table only lists through third-party hosts.
+	if setting.OpenRouterEnabled {
+		var unmatched []string
+		for _, pricing := range model.GetPricing() {
+			if pricing.BillingUsageSchema != nil || matchedModels[pricing.ModelName] {
+				continue
+			}
+			unmatched = append(unmatched, pricing.ModelName)
+		}
+		if len(unmatched) > 0 {
+			openRouterURL := setting.OpenRouterURL
+			if openRouterURL == "" {
+				openRouterURL = official_price_setting.DefaultOpenRouterURL
+			}
+			if body, fetchErr := fetchOfficialPriceTable(ctx, openRouterURL); fetchErr == nil {
+				if catalog, parseErr := parseOpenRouterPrices(body); parseErr == nil {
+					for _, name := range unmatched {
+						row, ok := lookupOpenRouter(catalog, name)
+						if !ok {
+							continue
+						}
+						state.MatchedOpenRouter++
+						rows = append(rows, row)
+					}
+				}
+			}
+		}
+	}
+
 	updated, err := model.SaveOfficialPriceSync(rows)
 	if err != nil {
 		return failOfficialPriceSync(state, err)

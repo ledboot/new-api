@@ -271,6 +271,8 @@ export type ModelSettings = {
   'official_price_setting.enabled': boolean
   'official_price_setting.interval_hours': number
   'official_price_setting.source_url': string
+  'official_price_setting.openrouter_enabled': boolean
+  'official_price_setting.openrouter_url': string
 }
 
 export type BillingSettings = {

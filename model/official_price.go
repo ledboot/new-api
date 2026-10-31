@@ -139,13 +139,14 @@ func SaveOfficialPriceSync(rows []OfficialPrice) (int, error) {
 
 // SyncState is persisted so every node reports the same last-run information.
 type OfficialPriceSyncState struct {
-	LastRunTime  int64  `json:"last_run_time"`
-	Updated      int    `json:"updated"`
-	Matched      int    `json:"matched"`
-	Skipped      int    `json:"skipped"`
-	Error        string `json:"error"`
-	SourceURL    string `json:"source_url"`
-	SourceFormat string `json:"source_format"`
+	LastRunTime       int64  `json:"last_run_time"`
+	Updated           int    `json:"updated"`
+	Matched           int    `json:"matched"`
+	MatchedOpenRouter int    `json:"matched_openrouter"`
+	Skipped           int    `json:"skipped"`
+	Error             string `json:"error"`
+	SourceURL         string `json:"source_url"`
+	SourceFormat      string `json:"source_format"`
 }
 
 const officialPriceSyncStateKey = "official_price_sync_state"
