@@ -19,11 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import type { StatusBadgeProps } from '@/components/status-badge'
 import { formatTimestampToDate } from '@/lib/format'
 
-import type { TopupStatus } from '../types'
-
-// ============================================================================
-// Billing Utility Functions
-// ============================================================================
+import { PAYMENT_METHOD_ADMIN_GRANT, type OrderStatus } from '../types'
 
 interface StatusConfig {
   variant: StatusBadgeProps['variant']
@@ -33,7 +29,7 @@ interface StatusConfig {
 /**
  * Status badge configuration
  */
-export const STATUS_CONFIG: Record<TopupStatus, StatusConfig> = {
+export const STATUS_CONFIG: Record<OrderStatus, StatusConfig> = {
   success: {
     variant: 'success',
     label: 'Success',
@@ -41,6 +37,10 @@ export const STATUS_CONFIG: Record<TopupStatus, StatusConfig> = {
   pending: {
     variant: 'warning',
     label: 'Pending',
+  },
+  failed: {
+    variant: 'danger',
+    label: 'Failed',
   },
   expired: {
     variant: 'danger',
@@ -51,7 +51,7 @@ export const STATUS_CONFIG: Record<TopupStatus, StatusConfig> = {
 /**
  * Get status badge configuration
  */
-export function getStatusConfig(status: TopupStatus): StatusConfig {
+export function getStatusConfig(status: OrderStatus): StatusConfig {
   return STATUS_CONFIG[status] || STATUS_CONFIG.pending
 }
 
@@ -59,6 +59,7 @@ export function getStatusConfig(status: TopupStatus): StatusConfig {
  * Payment method display names
  */
 export const PAYMENT_METHOD_NAMES: Record<string, string> = {
+  [PAYMENT_METHOD_ADMIN_GRANT]: 'Admin Grant',
   bepusdt: 'BEpusdt',
   stripe: 'Stripe',
   alipay: 'Alipay',

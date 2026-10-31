@@ -35,6 +35,10 @@ const (
 	PaymentMethodWaffoPancake = "waffo_pancake"
 	PaymentMethodBalance      = "balance"
 	PaymentMethodBepusdt      = "bepusdt"
+	// PaymentMethodAdminGrant marks a balance increase an administrator made
+	// from the console. It is recorded as a completed order for auditing, but
+	// it is not a purchase and never appears in a customer's own order list.
+	PaymentMethodAdminGrant = "admin_grant"
 )
 
 const (
@@ -45,6 +49,7 @@ const (
 	PaymentProviderWaffoPancake = "waffo_pancake"
 	PaymentProviderBalance      = "balance"
 	PaymentProviderBepusdt      = "bepusdt"
+	PaymentProviderAdminGrant   = PaymentMethodAdminGrant
 )
 
 var (
@@ -61,6 +66,30 @@ func (topUp *TopUp) Insert() error {
 	var err error
 	err = DB.Create(topUp).Error
 	return err
+}
+
+// RecordAdminQuotaGrant stores an administrative quota increase as a completed
+// order so administrators can audit balance changes next to real payments.
+// Amount holds the credited quota, matching how per-call providers record a
+// credit; Money stays zero because nothing was paid. The caller treats a
+// failure as non-fatal: the balance has already been committed.
+func RecordAdminQuotaGrant(userId int, creditedQuota int) error {
+	if userId <= 0 || creditedQuota <= 0 {
+		return ErrInvalidTopUpQuota
+	}
+	now := common.GetTimestamp()
+	topUp := &TopUp{
+		UserId:          userId,
+		Amount:          int64(creditedQuota),
+		Money:           0,
+		TradeNo:         fmt.Sprintf("ADM%dG%d%s", userId, now, common.GetRandomString(8)),
+		PaymentMethod:   PaymentMethodAdminGrant,
+		PaymentProvider: PaymentProviderAdminGrant,
+		CreateTime:      now,
+		CompleteTime:    now,
+		Status:          common.TopUpStatusSuccess,
+	}
+	return topUp.Insert()
 }
 
 func topUpQuotaMaxCurrent(creditedQuota int) (int, error) {
@@ -316,15 +345,21 @@ func GetUserTopUps(userId int, pageInfo *common.PageInfo) (topups []*TopUp, tota
 
 	cutoff := topUpQueryCutoff()
 
+	// Administrative grants are not purchases, so a customer's own order list
+	// only shows orders they actually paid for.
+	scope := func() *gorm.DB {
+		return tx.Model(&TopUp{}).Where("user_id = ? AND create_time >= ? AND COALESCE(payment_provider, '') <> ?", userId, cutoff, PaymentProviderAdminGrant)
+	}
+
 	// Get total count within transaction
-	err = tx.Model(&TopUp{}).Where("user_id = ? AND create_time >= ?", userId, cutoff).Count(&total).Error
+	err = scope().Count(&total).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
 	}
 
 	// Get paginated topups within same transaction
-	err = tx.Where("user_id = ? AND create_time >= ?", userId, cutoff).Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Find(&topups).Error
+	err = scope().Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Find(&topups).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
@@ -383,7 +418,7 @@ func SearchUserTopUps(userId int, keyword string, pageInfo *common.PageInfo) (to
 		}
 	}()
 
-	query := tx.Model(&TopUp{}).Where("user_id = ? AND create_time >= ?", userId, topUpQueryCutoff())
+	query := tx.Model(&TopUp{}).Where("user_id = ? AND create_time >= ? AND COALESCE(payment_provider, '') <> ?", userId, topUpQueryCutoff(), PaymentProviderAdminGrant)
 	if keyword != "" {
 		pattern, perr := sanitizeLikePattern(keyword)
 		if perr != nil {

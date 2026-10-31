@@ -128,6 +128,10 @@ export function SidebarModulesSection({
         title: t('Wallet'),
         description: t('Top up balance and view billing history.'),
       },
+      orders: {
+        title: t('Orders'),
+        description: t('Top-up order history and payment records.'),
+      },
       personal: {
         title: t('Profile'),
         description: t('Personal settings and profile management.'),

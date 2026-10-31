@@ -249,6 +249,7 @@ func generateDefaultSidebarConfigForRole(userRole int) string {
 	defaultConfig["personal"] = map[string]any{
 		"enabled":  true,
 		"topup":    true,
+		"orders":   true,
 		"personal": true,
 	}
 

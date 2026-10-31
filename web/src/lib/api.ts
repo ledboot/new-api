@@ -37,6 +37,17 @@ export type { AuthTokenRotation, RefreshOutcome } from '@/lib/auth-session'
 export { api }
 export type { ApiRequestConfig } from '@/lib/http-client'
 
+/**
+ * Whether a backend envelope reports success. Accepts the two shapes the
+ * console uses: an explicit `success` flag, or a legacy `message: 'success'`.
+ */
+export function isApiSuccess(response: {
+  success?: boolean
+  message?: string
+}): boolean {
+  return response.success === true || response.message === 'success'
+}
+
 // ============================================================================
 // User APIs
 // ============================================================================

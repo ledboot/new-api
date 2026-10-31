@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Gift, ExternalLink, Loader2, Receipt, WalletCards } from 'lucide-react'
+import { Gift, ExternalLink, Loader2, WalletCards } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 
@@ -73,7 +73,6 @@ interface RechargeFormCardProps {
   paymentCurrency?: string
   priceRatio?: number
   usdExchangeRate?: number
-  onOpenBilling?: () => void
   creemProducts?: CreemProduct[]
   enableCreemTopup?: boolean
   onCreemProductSelect?: (product: CreemProduct) => void
@@ -104,7 +103,6 @@ export function RechargeFormCard({
   paymentCurrency = '',
   priceRatio = 1,
   usdExchangeRate = 1,
-  onOpenBilling,
   creemProducts,
   enableCreemTopup,
   onCreemProductSelect,
@@ -206,19 +204,6 @@ export function RechargeFormCard({
       icon={<WalletCards className='h-4 w-4' />}
       iconTone='success'
       disableHoverEffect
-      action={
-        onOpenBilling ? (
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={onOpenBilling}
-            className='w-full gap-2 sm:w-auto'
-          >
-            <Receipt className='h-4 w-4' />
-            {t('Order History')}
-          </Button>
-        ) : null
-      }
       contentClassName='space-y-4 sm:space-y-6'
     >
       {/* Online Topup Section */}

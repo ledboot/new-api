@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { api } from '@/lib/api'
+import { api, isApiSuccess } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
 import type {
@@ -32,8 +32,6 @@ import type {
   StripePaymentResponse,
   AffiliateCodeResponse,
   AffiliateTransferResponse,
-  BillingHistoryResponse,
-  CompleteOrderRequest,
   CreemPaymentRequest,
   CreemPaymentResponse,
   WaffoPaymentRequest,
@@ -49,9 +47,7 @@ import type {
 /**
  * Check if API response is successful
  */
-export function isApiSuccess(response: ApiResponse): boolean {
-  return response.success === true || response.message === 'success'
-}
+export { isApiSuccess }
 
 /**
  * Get topup configuration info
@@ -197,54 +193,6 @@ export async function transferAffiliateQuota(
   request: AffiliateTransferRequest
 ): Promise<AffiliateTransferResponse> {
   const res = await api.post('/api/user/aff_transfer', request)
-  return res.data
-}
-
-/**
- * Get billing history for current user
- */
-export async function getUserBillingHistory(
-  page: number,
-  pageSize: number,
-  keyword?: string
-): Promise<ApiResponse<BillingHistoryResponse>> {
-  const params = new URLSearchParams({
-    p: page.toString(),
-    page_size: pageSize.toString(),
-  })
-  if (keyword) {
-    params.append('keyword', keyword)
-  }
-  const res = await api.get(`/api/user/topup/self?${params.toString()}`)
-  return res.data
-}
-
-/**
- * Get billing history for all users (admin only)
- */
-export async function getAllBillingHistory(
-  page: number,
-  pageSize: number,
-  keyword?: string
-): Promise<ApiResponse<BillingHistoryResponse>> {
-  const params = new URLSearchParams({
-    p: page.toString(),
-    page_size: pageSize.toString(),
-  })
-  if (keyword) {
-    params.append('keyword', keyword)
-  }
-  const res = await api.get(`/api/user/topup?${params.toString()}`)
-  return res.data
-}
-
-/**
- * Complete a pending order (admin only)
- */
-export async function completeOrder(
-  request: CompleteOrderRequest
-): Promise<ApiResponse> {
-  const res = await api.post('/api/user/topup/complete', request)
   return res.data
 }
 

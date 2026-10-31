@@ -75,6 +75,14 @@ func manageUserQuota(c *gin.Context, req ManageRequest) {
 	if req.Mode != "override" {
 		params["quota"] = req.Value
 	}
+	// An increase is also an order the user received value from, so record it
+	// next to paid orders for later auditing. The balance is already committed,
+	// so a failure here is logged instead of failing the operation.
+	if delta := adjustment.After - adjustment.Before; delta > 0 {
+		if err := model.RecordAdminQuotaGrant(adjustment.UserID, delta); err != nil {
+			common.SysError(common.LogText("failed to record an admin quota grant as an order: user_id=%d quota=%d error=%s", adjustment.UserID, delta, err.Error()))
+		}
+	}
 	success = true
 	operation := model.AuditOperation{Action: action, Params: params}
 	model.RecordLogWithAdminInfo(adjustment.UserID, model.LogTypeTopup,
