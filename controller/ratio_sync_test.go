@@ -322,7 +322,10 @@ func TestOpenLuxFetchUsesAccountRatesAndDoesNotLeakCredentials(t *testing.T) {
 	openLuxTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/api/pricing_new" {
-			assert.Empty(t, r.Header.Get("Authorization"))
+			// With an account token the catalog is account-scoped, so the same
+			// credential authenticates both requests.
+			assert.Equal(t, "Bearer fixture-account-token", r.Header.Get("Authorization"))
+			assert.Equal(t, "42", r.Header.Get("New-Api-User"))
 			_, _ = w.Write([]byte(`{"success":true,"data":[{"model_name":"m"}],"group_ratio":{"public":1},"usable_group":{"public":"Public"}}`))
 			return
 		}

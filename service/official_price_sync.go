@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -169,6 +170,78 @@ func (index officialPriceIndex) lookup(modelName string) (liteLLMPrice, bool) {
 	return liteLLMPrice{}, false
 }
 
+// officialPriceRow converts a price-table entry into a stored row. An entry
+// with no usable per-token price yields false so the caller can skip it.
+func officialPriceRow(modelName string, entry liteLLMPrice) (model.OfficialPrice, bool) {
+	row := model.OfficialPrice{
+		ModelName:         modelName,
+		InputPrice:        roundPrice(entry.InputCostPerToken * 1_000_000),
+		OutputPrice:       roundPrice(entry.OutputCostPerToken * 1_000_000),
+		CacheReadPrice:    roundPrice(entry.CacheReadInputTokenCost * 1_000_000),
+		CacheWritePrice:   roundPrice(entry.CacheCreationInputTokenCost * 1_000_000),
+		CacheWrite1hPrice: roundPrice(entry.CacheCreationInputTokenCost1h * 1_000_000),
+	}
+	if row.InputPrice == 0 && row.OutputPrice == 0 && row.CacheReadPrice == 0 && row.CacheWritePrice == 0 && row.CacheWrite1hPrice == 0 {
+		return model.OfficialPrice{}, false
+	}
+	return row, true
+}
+
+// Hosts that resell a model list it at the vendor's price, so their median is a
+// usable reference when no first-party row exists. A published price far below
+// every host is a promotional or off-peak number rather than a list price.
+const (
+	officialPriceConsensusSamples = 3
+	officialPriceOutlierRatio     = 0.5
+)
+
+// buildOfficialPriceConsensus returns the median per-token price of every host
+// listing a model, whatever its provider.
+func buildOfficialPriceConsensus(entries map[string]liteLLMPrice) map[string]liteLLMPrice {
+	grouped := map[string][]liteLLMPrice{}
+	for rawName, entry := range entries {
+		key := normalizeModelKey(rawName)
+		if key == "" || entry.InputCostPerToken <= 0 {
+			continue
+		}
+		grouped[key] = append(grouped[key], entry)
+	}
+	consensus := make(map[string]liteLLMPrice, len(grouped))
+	for key, list := range grouped {
+		if len(list) < officialPriceConsensusSamples {
+			continue
+		}
+		consensus[key] = liteLLMPrice{
+			InputCostPerToken:             medianCost(list, func(entry liteLLMPrice) float64 { return entry.InputCostPerToken }),
+			OutputCostPerToken:            medianCost(list, func(entry liteLLMPrice) float64 { return entry.OutputCostPerToken }),
+			CacheReadInputTokenCost:       medianCost(list, func(entry liteLLMPrice) float64 { return entry.CacheReadInputTokenCost }),
+			CacheCreationInputTokenCost:   medianCost(list, func(entry liteLLMPrice) float64 { return entry.CacheCreationInputTokenCost }),
+			CacheCreationInputTokenCost1h: medianCost(list, func(entry liteLLMPrice) float64 { return entry.CacheCreationInputTokenCost1h }),
+		}
+	}
+	return consensus
+}
+
+// medianCost ignores missing (zero) prices so one silent host does not drag the
+// reference price down.
+func medianCost(list []liteLLMPrice, pick func(liteLLMPrice) float64) float64 {
+	values := make([]float64, 0, len(list))
+	for _, entry := range list {
+		if value := pick(entry); value > 0 {
+			values = append(values, value)
+		}
+	}
+	if len(values) == 0 {
+		return 0
+	}
+	sort.Float64s(values)
+	middle := len(values) / 2
+	if len(values)%2 == 0 {
+		return (values[middle-1] + values[middle]) / 2
+	}
+	return values[middle]
+}
+
 func parseLiteLLMPrices(body []byte) (map[string]liteLLMPrice, error) {
 	entries := map[string]liteLLMPrice{}
 	if err := json.Unmarshal(body, &entries); err != nil {
@@ -316,6 +389,7 @@ func SyncOfficialPrices(ctx context.Context) (model.OfficialPriceSyncState, erro
 		return failOfficialPriceSync(state, err)
 	}
 	index := buildOfficialPriceIndex(entries)
+	consensus := officialPriceIndex{prices: buildOfficialPriceConsensus(entries)}
 
 	setting := official_price_setting.GetSetting()
 	rows := make([]model.OfficialPrice, 0, len(entries))
@@ -330,24 +404,13 @@ func SyncOfficialPrices(ctx context.Context) (model.OfficialPriceSyncState, erro
 			continue
 		}
 		state.Matched++
-		input := roundPrice(entry.InputCostPerToken * 1_000_000)
-		output := roundPrice(entry.OutputCostPerToken * 1_000_000)
-		cacheRead := roundPrice(entry.CacheReadInputTokenCost * 1_000_000)
-		cacheWrite := roundPrice(entry.CacheCreationInputTokenCost * 1_000_000)
-		cacheWrite1h := roundPrice(entry.CacheCreationInputTokenCost1h * 1_000_000)
-		if input == 0 && output == 0 && cacheRead == 0 && cacheWrite == 0 && cacheWrite1h == 0 {
+		row, ok := officialPriceRow(pricing.ModelName, entry)
+		if !ok {
 			state.Skipped++
 			continue
 		}
 		matchedModels[pricing.ModelName] = true
-		rows = append(rows, model.OfficialPrice{
-			ModelName:         pricing.ModelName,
-			InputPrice:        input,
-			OutputPrice:       output,
-			CacheReadPrice:    cacheRead,
-			CacheWritePrice:   cacheWrite,
-			CacheWrite1hPrice: cacheWrite1h,
-		})
+		rows = append(rows, row)
 	}
 
 	// Fallback: OpenRouter carries GLM/Qwen/DeepSeek families under first-party
@@ -371,6 +434,11 @@ func SyncOfficialPrices(ctx context.Context) (model.OfficialPriceSyncState, erro
 						row, ok := lookupOpenRouter(catalog, name)
 						if !ok {
 							continue
+						}
+						if agreed, found := consensus.lookup(name); found {
+							if agreedRow, valid := officialPriceRow(name, agreed); valid && row.InputPrice < agreedRow.InputPrice*officialPriceOutlierRatio {
+								row = agreedRow
+							}
 						}
 						state.MatchedOpenRouter++
 						rows = append(rows, row)

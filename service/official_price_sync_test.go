@@ -147,3 +147,51 @@ func TestOfficialPriceProviderRanksAreUnique(t *testing.T) {
 		seen[rank] = provider
 	}
 }
+
+// A host median is a usable reference when no first-party row exists.
+func TestBuildOfficialPriceConsensusUsesHostMedian(t *testing.T) {
+	entries := map[string]liteLLMPrice{
+		"nebius/deepseek-v4.1-flash":      {InputCostPerToken: 3e-7, OutputCostPerToken: 1.2e-6, CacheReadInputTokenCost: 6e-9, LiteLLMProvider: "nebius"},
+		"tencent/deepseek-v4.1-flash":     {InputCostPerToken: 3e-7, OutputCostPerToken: 1.2e-6, CacheReadInputTokenCost: 6e-9, LiteLLMProvider: "tencent"},
+		"together_ai/deepseek-v4.1-flash": {InputCostPerToken: 3e-7, OutputCostPerToken: 1.2e-6, CacheReadInputTokenCost: 6e-9, LiteLLMProvider: "together_ai"},
+		// Two hosts only: not enough to call it a consensus.
+		"a/rare-model": {InputCostPerToken: 1e-6, LiteLLMProvider: "a"},
+		"b/rare-model": {InputCostPerToken: 2e-6, LiteLLMProvider: "b"},
+	}
+	consensus := officialPriceIndex{prices: buildOfficialPriceConsensus(entries)}
+
+	entry, ok := consensus.lookup("deepseek-v4.1-flash")
+	require.True(t, ok)
+	assert.InDelta(t, 3e-7, entry.InputCostPerToken, 1e-12)
+	assert.InDelta(t, 1.2e-6, entry.OutputCostPerToken, 1e-12)
+
+	_, ok = consensus.lookup("rare-model")
+	assert.False(t, ok)
+}
+
+// OpenRouter may publish a promotional price far below every host; the list
+// price comes from the hosts instead.
+func TestConsensusReplacesLowOpenRouterPrice(t *testing.T) {
+	catalog, err := parseOpenRouterPrices([]byte(`{"data":[
+		{"id":"deepseek/deepseek-v4.1-flash","pricing":{"prompt":"0.000000045","completion":"0.0000005"}}
+	]}`))
+	require.NoError(t, err)
+
+	row, ok := lookupOpenRouter(catalog, "deepseek-v4.1-flash")
+	require.True(t, ok)
+	assert.InDelta(t, 0.045, row.InputPrice, 1e-9)
+
+	hosts := map[string]liteLLMPrice{
+		"nebius/deepseek-v4.1-flash":      {InputCostPerToken: 3e-7, OutputCostPerToken: 1.2e-6, LiteLLMProvider: "nebius"},
+		"tencent/deepseek-v4.1-flash":     {InputCostPerToken: 3e-7, OutputCostPerToken: 1.2e-6, LiteLLMProvider: "tencent"},
+		"together_ai/deepseek-v4.1-flash": {InputCostPerToken: 3e-7, OutputCostPerToken: 1.2e-6, LiteLLMProvider: "together_ai"},
+	}
+	consensus := officialPriceIndex{prices: buildOfficialPriceConsensus(hosts)}
+	agreed, found := consensus.lookup("deepseek-v4.1-flash")
+	require.True(t, found)
+	agreedRow, valid := officialPriceRow("deepseek-v4.1-flash", agreed)
+	require.True(t, valid)
+	assert.Less(t, row.InputPrice, agreedRow.InputPrice*officialPriceOutlierRatio)
+	assert.InDelta(t, 0.3, agreedRow.InputPrice, 1e-9)
+	assert.InDelta(t, 1.2, agreedRow.OutputPrice, 1e-9)
+}
