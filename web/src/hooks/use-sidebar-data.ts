@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   Activity,
+  HeartPulse,
   Box,
   ClipboardList,
   CreditCard,
@@ -83,6 +84,11 @@ export function useSidebarData(): SidebarData {
             title: t('Dashboard'),
             url: '/dashboard/models',
             icon: LayoutDashboard,
+          },
+          {
+            title: t('Channel Status'),
+            url: '/channel-status',
+            icon: HeartPulse,
           },
           {
             title: t('API Keys'),

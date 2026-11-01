@@ -45,6 +45,7 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"POST /api/ratio_sync/openlux/sales/publish": accessTokenSessionRule,
 	// router/api-router.go: top level
 	"GET /api/models":                     accessTokenScopeRule("profile:read"),
+	"GET /api/channel_status":             accessTokenScopeRule("profile:read"),
 	"GET /api/status/test":                accessTokenScopeRule("log:read"),
 	"GET /api/pricing":                    accessTokenAnyRule,
 	"GET /api/perf-metrics/summary":       accessTokenAnyRule,
