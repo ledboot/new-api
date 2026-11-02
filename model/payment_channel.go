@@ -95,6 +95,10 @@ type PaymentChannelOrder struct {
 
 const PaymentProviderChannel = "payment_channel"
 
+// Payment502OrderValiditySeconds is how long a 502 order can still be paid. The
+// checkout countdown and the notify callback both enforce this window.
+const Payment502OrderValiditySeconds = 5 * 60
+
 var paymentMethodIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 
 func ValidatePaymentChannel(channel *PaymentChannel) error {
@@ -244,6 +248,9 @@ func CompletePaymentChannelOrder(tradeNo string, channelID int, provider, curren
 		}
 		if topup.Status != common.TopUpStatusPending {
 			return ErrTopUpStatusInvalid
+		}
+		if provider == "502" && common.GetTimestamp() > topup.CreateTime+Payment502OrderValiditySeconds {
+			return ErrPaymentOrderExpired
 		}
 		if order.CreditedQuota <= 0 || order.CreditedQuota > common.MaxWalletQuota {
 			return ErrInvalidTopUpQuota

@@ -394,6 +394,7 @@ export function Wallet() {
         processing={processing || waffoProcessing || pancakeProcessing}
         discountRate={getDiscountRate()}
         usdExchangeRate={effectiveUsdExchangeRate}
+        channelQuote={channelQuote.data ?? null}
       />
 
       <TransferDialog

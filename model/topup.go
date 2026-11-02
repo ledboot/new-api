@@ -56,6 +56,7 @@ var (
 	ErrPaymentMethodMismatch = errors.New("payment method mismatch")
 	ErrTopUpNotFound         = errors.New("topup not found")
 	ErrTopUpStatusInvalid    = errors.New("topup status invalid")
+	ErrPaymentOrderExpired   = errors.New("payment order expired")
 	// The quota errors reach the web console, so they carry message keys.
 	ErrInvalidTopUpQuota        error = common.NewMessage("Invalid top-up quota")
 	ErrTopUpQuotaLimitExceeded  error = common.NewMessage("Top-up quota limit exceeded")

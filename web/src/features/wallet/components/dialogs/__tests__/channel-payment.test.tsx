@@ -17,8 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
-import { expect, test, vi } from 'vitest'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, expect, test, vi } from 'vitest'
 
 import { api } from '@/lib/api'
 
@@ -28,6 +28,10 @@ vi.mock('@/lib/api', () => ({ api: { get: vi.fn() } }))
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 test('a native crypto QR shows the network and exact amount while waiting for verified payment', async () => {
   vi.mocked(api.get).mockResolvedValue({
@@ -88,6 +92,56 @@ test('an expired crypto quote hides the payment QR to prevent transfers using a 
   expect(
     screen.queryByRole('button', { name: 'Copy payment code' })
   ).not.toBeInTheDocument()
+  expect(
+    screen.getByText(
+      'This payment code has expired. Check the payment status or create a new order.'
+    )
+  ).toBeVisible()
+  view.unmount()
+  client.clear()
+})
+
+test('the timed CNY QR counts down the 5-minute order window and hides the code at zero', async () => {
+  vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+  vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+  vi.mocked(api.get).mockResolvedValue({
+    data: { success: true, data: { status: 'pending' } },
+  })
+  const client = new QueryClient()
+  const view = render(
+    <QueryClientProvider client={client}>
+      <ChannelPaymentDialog
+        checkout={{
+          kind: 'qr',
+          order_id: 'PC-timed',
+          amount: '33.85',
+          currency: 'CNY',
+          qr_code: 'weixin://pay',
+          expires_at: Date.parse('2026-01-01T00:05:00Z') / 1000,
+        }}
+        onClose={vi.fn()}
+        onPaid={vi.fn()}
+      />
+    </QueryClientProvider>
+  )
+  expect(screen.getByRole('timer')).toHaveTextContent('05:00')
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'You must enter the exact amount shown above'
+  )
+  expect(
+    screen.getByText(
+      'The order is held for at most 5 minutes. Pay before the countdown ends.'
+    )
+  ).toBeVisible()
+  act(() => {
+    vi.advanceTimersByTime(1000)
+  })
+  expect(screen.getByRole('timer')).toHaveTextContent('04:59')
+  act(() => {
+    vi.advanceTimersByTime(299_000)
+  })
+  expect(screen.queryByRole('timer')).not.toBeInTheDocument()
+  expect(screen.queryByTitle('Payment QR code')).not.toBeInTheDocument()
   expect(
     screen.getByText(
       'This payment code has expired. Check the payment status or create a new order.'

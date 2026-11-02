@@ -306,6 +306,11 @@ func RequestChannelPayment(c *gin.Context) {
 		paymentError(c, common.NewMessage("Failed to start payment"))
 		return
 	}
+	// 502 orders close at a fixed deadline; the countdown must match the one the
+	// notify callback enforces, so it is derived from the stored order time.
+	if channel.Provider == "502" {
+		checkout.ExpiresAt = topup.CreateTime + model.Payment502OrderValiditySeconds
+	}
 	// Keep pending on upstream timeout; a later authenticated callback may still
 	// settle an order that the upstream accepted before the connection failed.
 	if err := model.DB.Model(&model.PaymentChannelOrder{}).Where("trade_no = ?", tradeNo).Update("provider_ref", checkout.ProviderRef).Error; err != nil {

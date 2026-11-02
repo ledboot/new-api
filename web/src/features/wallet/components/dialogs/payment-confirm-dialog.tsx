@@ -32,6 +32,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatLocalCurrencyAmount } from '@/lib/currency'
 
+import type { ChannelPaymentQuote } from '../../api'
 import { DEFAULT_DISCOUNT_RATE, PAYMENT_TYPES } from '../../constants'
 import { formatCurrency, getPaymentIcon } from '../../lib'
 import type { PaymentMethod } from '../../types'
@@ -47,6 +48,7 @@ interface PaymentConfirmDialogProps {
   processing: boolean
   discountRate?: number
   usdExchangeRate?: number
+  channelQuote?: ChannelPaymentQuote | null
 }
 
 export function PaymentConfirmDialog({
@@ -60,6 +62,7 @@ export function PaymentConfirmDialog({
   processing,
   discountRate = DEFAULT_DISCOUNT_RATE,
   usdExchangeRate = 1,
+  channelQuote = null,
 }: PaymentConfirmDialogProps) {
   const { t } = useTranslation()
   let paymentCurrency = ''
@@ -70,6 +73,14 @@ export function PaymentConfirmDialog({
   const hasDiscount = discountRate > 0 && discountRate < 1 && paymentAmount > 0
   const originalAmount = hasDiscount ? paymentAmount / discountRate : 0
   const discountAmount = hasDiscount ? originalAmount - paymentAmount : 0
+  // CNY channels settle in local currency, so the rate and fee explain the total.
+  // The quote must belong to the selected method; a stale one is ignored.
+  const cnyQuote =
+    !calculating &&
+    channelQuote?.currency === 'CNY' &&
+    channelQuote.payment_method === paymentMethod?.type
+      ? channelQuote
+      : null
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -126,6 +137,33 @@ export function PaymentConfirmDialog({
                 <span className='font-semibold text-green-600'>
                   {formatCurrency(discountAmount)}
                   {paymentCurrency}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {cnyQuote && (
+            <div className='bg-muted/50 space-y-2 rounded-lg p-3 text-sm'>
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground'>
+                  {t('Exchange rate')}
+                </span>
+                <span className='font-medium'>
+                  1 USD = {Number(cnyQuote.fx_rate)} {cnyQuote.currency}
+                </span>
+              </div>
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground'>{t('Subtotal')}</span>
+                <span className='font-medium'>
+                  {cnyQuote.subtotal} {cnyQuote.currency}
+                </span>
+              </div>
+              <div className='flex items-center justify-between'>
+                <span className='text-muted-foreground'>
+                  {t('Payment fee')} ({cnyQuote.fee_percent}%)
+                </span>
+                <span className='font-medium'>
+                  {cnyQuote.fee_amount} {cnyQuote.currency}
                 </span>
               </div>
             </div>

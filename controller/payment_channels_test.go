@@ -314,6 +314,44 @@ func TestPaymentChannelProviderCheckout(t *testing.T) {
 	}
 }
 
+func TestPaymentChannel502NotifyHonorsFiveMinuteOrderValidity(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		ageSeconds  int64
+		status      int
+		topupStatus string
+	}{
+		{name: "payment inside the validity window credits the order", ageSeconds: model.Payment502OrderValiditySeconds - 1, status: http.StatusOK, topupStatus: common.TopUpStatusSuccess},
+		{name: "payment after the validity window is rejected and the order stays unpaid", ageSeconds: model.Payment502OrderValiditySeconds + 1, status: http.StatusBadRequest, topupStatus: common.TopUpStatusPending},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := modelManagementDB(t, "sqlite", "")
+			require.NoError(t, db.AutoMigrate(&model.TopUp{}, &model.Log{}, &model.PaymentChannel{}, &model.PaymentChannelOrder{}))
+			user := model.User{Username: "502-buyer", Group: "default", Status: common.UserStatusEnabled}
+			require.NoError(t, db.Create(&user).Error)
+			order := model.PaymentChannelOrder{TradeNo: "PC-502", ChannelID: 4, UserID: user.Id, Provider: "502", Currency: "CNY", Money: "33.85", CreditedQuota: 2500000, WalletAmount: "5",
+				Config: model.PaymentChannelConfig{APIKey: "502-key", MerchantID: "1001"}, Method: model.PaymentChannelMethod{Name: "WeChat Pay", Type: "wxpay"}}
+			topup := model.TopUp{TradeNo: order.TradeNo, UserId: user.Id, Amount: 5, Money: 33.85, PaymentProvider: model.PaymentProviderChannel, PaymentMethod: "wxpay",
+				CreateTime: common.GetTimestamp() - tc.ageSeconds, Status: common.TopUpStatusPending}
+			require.NoError(t, model.CreatePaymentChannelOrder(&order, &topup))
+			params := map[string]string{"pid": "1001", "type": "wxpay", "out_trade_no": order.TradeNo, "trade_no": "gateway-502", "money": "33.85", "trade_status": "TRADE_SUCCESS"}
+			params["sign"] = channelEpaySignature(params, "502-key")
+			form := url.Values{}
+			for key, value := range params {
+				form.Set(key, value)
+			}
+			request := httptest.NewRequest(http.MethodPost, "/notify/502/4", bytes.NewReader([]byte(form.Encode())))
+			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			router := gin.New()
+			router.POST("/notify/:provider/:id", PaymentChannelNotify)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, request)
+			assert.Equal(t, tc.status, w.Code)
+			assert.Equal(t, tc.topupStatus, model.GetTopUpByTradeNo(order.TradeNo).Status)
+		})
+	}
+}
+
 func TestPaymentChannelSignedWebhooks(t *testing.T) {
 	for _, provider := range []string{"stripe", "creem", "bepusdt"} {
 		t.Run(provider, func(t *testing.T) {
