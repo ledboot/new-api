@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting/fx_setting"
 	"github.com/stretchr/testify/require"
 )
 
@@ -160,31 +161,66 @@ func TestPaymentChannelBepusdtMethodsAndCreemQuote(t *testing.T) {
 			{ID: "network", Name: network, Type: network, Interaction: "redirect", UnitPrice: "1", MinTopup: 1, Enabled: true},
 		}}
 		require.NoError(t, model.ValidatePaymentChannel(&channel))
-		money, quota, err := quoteChannelPayment(&channel, &channel.Methods[0], 10, "default")
+		quote, err := quoteChannelPayment(&channel, &channel.Methods[0], 10, "default")
 		require.NoError(t, err)
-		assert.Equal(t, "8.00", money.StringFixed(2))
-		assert.Equal(t, 5000000, quota)
+		assert.Equal(t, "8.00", quote.Total.StringFixed(2))
+		assert.Equal(t, 5000000, quote.Quota)
+		assert.Equal(t, "1.000000", quote.FxRate.StringFixed(6), "a USD channel is charged as-is")
 	}
 	feeChannel := model.PaymentChannel{Provider: "bepusdt", Currency: "USD"}
 	feeMethod := model.PaymentChannelMethod{UnitPrice: "0.8", MinTopup: 1, FeePercent: "2.5", FeeFixed: "0.3"}
-	feeMoney, feeQuota, feeErr := quoteChannelPayment(&feeChannel, &feeMethod, 10, "default")
+	feeQuote, feeErr := quoteChannelPayment(&feeChannel, &feeMethod, 10, "default")
 	require.NoError(t, feeErr)
 	// Base 10 x 0.8 x group ratio 0.8 = 6.40, then 2.5% + 0.30 fixed = 6.86.
-	assert.Equal(t, "6.86", feeMoney.StringFixed(2))
-	assert.Equal(t, 5000000, feeQuota)
+	assert.Equal(t, "6.86", feeQuote.Total.StringFixed(2))
+	assert.Equal(t, "6.40", feeQuote.Subtotal.StringFixed(2))
+	assert.Equal(t, "0.46", feeQuote.FeeAmount.StringFixed(2))
+	assert.Equal(t, 5000000, feeQuote.Quota)
 
 	channel := model.PaymentChannel{Provider: "creem"}
 	method := model.PaymentChannelMethod{UnitPrice: "9.99", CreditAmount: "10.5", ProductID: "prod_one"}
-	money, quota, err := quoteChannelPayment(&channel, &method, 9999, "default")
+	creemQuote, err := quoteChannelPayment(&channel, &method, 9999, "default")
 	require.NoError(t, err)
-	assert.Equal(t, "9.99", money.StringFixed(2))
-	assert.Equal(t, 5250000, quota)
+	assert.Equal(t, "9.99", creemQuote.Total.StringFixed(2))
+	assert.Equal(t, 5250000, creemQuote.Quota)
 	importedStripe := model.PaymentChannel{Provider: "stripe", LegacyProvider: "stripe"}
 	stripeMethod := model.PaymentChannelMethod{UnitPrice: "1", MinTopup: 1}
-	money, quota, err = quoteChannelPayment(&importedStripe, &stripeMethod, 10, "vip")
+	stripeQuote, err := quoteChannelPayment(&importedStripe, &stripeMethod, 10, "vip")
 	require.NoError(t, err)
-	assert.Equal(t, "4.00", money.StringFixed(2))
-	assert.Equal(t, 2500000, quota)
+	assert.Equal(t, "4.00", stripeQuote.Total.StringFixed(2))
+	assert.Equal(t, 2500000, stripeQuote.Quota)
+}
+
+func TestPaymentChannelQuoteAppliesExchangeRateToNonUsdChannels(t *testing.T) {
+	setting := fx_setting.GetSetting()
+	previousEnabled, previousManual, previousCurrency := setting.Enabled, setting.ManualRate, setting.QuoteCurrency
+	t.Cleanup(func() {
+		setting.Enabled, setting.ManualRate, setting.QuoteCurrency = previousEnabled, previousManual, previousCurrency
+	})
+	setting.Enabled, setting.ManualRate, setting.QuoteCurrency = true, 7.2, "CNY"
+
+	channel := model.PaymentChannel{Provider: "502", Currency: "CNY"}
+	method := model.PaymentChannelMethod{UnitPrice: "1", MinTopup: 1, FeePercent: "1.5"}
+	quote, err := quoteChannelPayment(&channel, &method, 5, "default")
+	require.NoError(t, err)
+	// 5 USD credit x unit price 1 = 5.00, converted at 7.2 to 36.00, then the
+	// 1.5% surcharge is added on top of the converted amount.
+	assert.Equal(t, "7.200000", quote.FxRate.StringFixed(6))
+	assert.Equal(t, "36.00", quote.Subtotal.StringFixed(2))
+	assert.Equal(t, "36.54", quote.Total.StringFixed(2))
+	assert.Equal(t, 2500000, quote.Quota, "the credited quota stays in USD")
+
+	usdChannel := model.PaymentChannel{Provider: "stripe", Currency: "USD"}
+	usdQuote, err := quoteChannelPayment(&usdChannel, &method, 5, "default")
+	require.NoError(t, err)
+	assert.Equal(t, "1.000000", usdQuote.FxRate.StringFixed(6))
+	assert.Equal(t, "5.08", usdQuote.Total.StringFixed(2))
+
+	// A channel in a currency without a configured rate must refuse to price
+	// rather than silently charge USD.
+	eurChannel := model.PaymentChannel{Provider: "stripe", Currency: "EUR"}
+	_, err = quoteChannelPayment(&eurChannel, &method, 5, "default")
+	assert.Error(t, err)
 }
 
 type channelRoundTripFunc func(*http.Request) (*http.Response, error)

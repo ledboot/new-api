@@ -121,6 +121,9 @@ func main() {
 	// 官方参考价定时同步（仅 master 节点，按设置间隔执行）
 	go service.StartOfficialPriceSync()
 
+	// 支付渠道汇率定时刷新（仅 master 节点）
+	go service.StartFxRefresh()
+
 	// 数据看板
 	go model.UpdateQuotaData()
 

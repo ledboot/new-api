@@ -37,6 +37,7 @@ import {
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
+import type { ChannelPaymentQuote } from '../api'
 import {
   formatCurrency,
   getDiscountLabel,
@@ -71,6 +72,8 @@ interface RechargeFormCardProps {
   topupLink?: string
   loading?: boolean
   paymentCurrency?: string
+  channelQuote?: ChannelPaymentQuote | null
+  channelQuoteLoading?: boolean
   priceRatio?: number
   usdExchangeRate?: number
   creemProducts?: CreemProduct[]
@@ -81,6 +84,54 @@ interface RechargeFormCardProps {
   waffoMinTopup?: number
   onWaffoMethodSelect?: (method: WaffoPayMethod, index: number) => void
   enableWaffoPancakeTopup?: boolean
+}
+
+function ChannelQuoteBreakdown(props: {
+  quote: ChannelPaymentQuote
+  loading?: boolean
+}) {
+  const { t } = useTranslation()
+  const quote = props.quote
+  const feeAmount = Number(quote.fee_amount)
+  const showRate = quote.currency !== 'USD' && Number(quote.fx_rate) !== 1
+  return (
+    <dl
+      className='bg-muted/40 space-y-1 rounded-lg px-3 py-2 text-sm'
+      aria-busy={props.loading}
+    >
+      {showRate && (
+        <div className='flex justify-between gap-2'>
+          <dt className='text-muted-foreground'>{t('Rate')}</dt>
+          <dd>
+            1 USD = {quote.fx_rate} {quote.currency}
+          </dd>
+        </div>
+      )}
+      <div className='flex justify-between gap-2'>
+        <dt className='text-muted-foreground'>{t('Subtotal')}</dt>
+        <dd>
+          {quote.subtotal} {quote.currency}
+        </dd>
+      </div>
+      {feeAmount > 0 && (
+        <div className='flex justify-between gap-2'>
+          <dt className='text-muted-foreground'>{t('Fee')}</dt>
+          <dd>
+            {quote.fee_percent > 0 ? `${quote.fee_percent}%` : ''}
+            {quote.fee_percent > 0 && Number(quote.fee_fixed) > 0 ? ' + ' : ''}
+            {Number(quote.fee_fixed) > 0 ? quote.fee_fixed : ''} ={' '}
+            {quote.fee_amount} {quote.currency}
+          </dd>
+        </div>
+      )}
+      <div className='flex justify-between gap-2 font-medium'>
+        <dt>{t('Total')}</dt>
+        <dd>
+          {quote.total} {quote.currency}
+        </dd>
+      </div>
+    </dl>
+  )
 }
 
 export function RechargeFormCard({
@@ -101,6 +152,8 @@ export function RechargeFormCard({
   topupLink,
   loading,
   paymentCurrency = '',
+  channelQuote,
+  channelQuoteLoading,
   priceRatio = 1,
   usdExchangeRate = 1,
   creemProducts,
@@ -371,11 +424,6 @@ export function RechargeFormCard({
                             <span className='max-w-full truncate'>
                               {method.name}
                             </span>
-                            {method.channel_name && (
-                              <span className='text-muted-foreground max-w-full truncate text-[11px]'>
-                                {method.channel_name}
-                              </span>
-                            )}
                             {disabledLabel && (
                               <span className='text-muted-foreground max-w-full truncate text-[11px] leading-4 font-normal'>
                                 {disabledLabel}
@@ -406,6 +454,12 @@ export function RechargeFormCard({
                       )}
                     </AlertDescription>
                   </Alert>
+                )}
+                {channelQuote && (
+                  <ChannelQuoteBreakdown
+                    quote={channelQuote}
+                    loading={channelQuoteLoading}
+                  />
                 )}
               </div>
 

@@ -134,10 +134,10 @@ test('a saved method keeps the configured percentage and fixed fee', () => {
     />
   )
   fireEvent.change(
-    screen.getByLabelText('Fee percentage (%) 1', { exact: false }),
+    screen.getByLabelText('Fee percentage (%)', { exact: false }),
     { target: { value: '2.5' } }
   )
-  fireEvent.change(screen.getByLabelText('Fixed fee (CNY) 1'), {
+  fireEvent.change(screen.getByLabelText('Fixed fee (CNY)'), {
     target: { value: '0.3' },
   })
   fireEvent.click(screen.getByRole('button', { name: 'Save payment channel' }))

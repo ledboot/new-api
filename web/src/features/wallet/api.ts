@@ -70,6 +70,31 @@ export async function redeemTopupCode(
 /**
  * Calculate payment amount for regular payment
  */
+export type ChannelPaymentQuote = {
+  payment_method: string
+  amount: number
+  currency: string
+  fx_rate: string
+  subtotal: string
+  fee_percent: number
+  fee_fixed: string
+  fee_amount: string
+  total: string
+  quota: number
+}
+
+export async function getChannelPaymentQuote(request: {
+  amount: number
+  payment_method: string
+}): Promise<ChannelPaymentQuote> {
+  const res = await api.post<{ success: boolean; data: ChannelPaymentQuote }>(
+    '/api/user/payment/quote',
+    request,
+    { skipBusinessError: true } as Record<string, unknown>
+  )
+  return res.data.data
+}
+
 export async function calculateAmount(
   request: AmountRequest
 ): Promise<AmountResponse> {

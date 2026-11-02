@@ -53,14 +53,14 @@ test('adding a 502 channel submits Alipay and WeChat methods together in one req
   await user.type(screen.getByLabelText('Channel name'), '502 gateway')
   await user.type(screen.getByLabelText('Merchant ID'), '1001')
   await user.type(screen.getByLabelText('API key'), 'merchant-secret')
-  await user.type(screen.getByLabelText('Method name 1'), 'Alipay')
+  await user.type(screen.getAllByLabelText('Method name')[0], 'Alipay')
   await user.click(screen.getByRole('button', { name: 'Add payment method' }))
-  await user.type(screen.getByLabelText('Method name 2'), 'WeChat')
+  await user.type(screen.getAllByLabelText('Method name')[1], 'WeChat')
   await user.click(screen.getByRole('combobox', { name: 'Payment type 2' }))
   await user.click(await screen.findByRole('option', { name: 'WeChat Pay' }))
-  expect(
-    screen.getByRole('combobox', { name: 'Payment type 2' })
-  ).toHaveValue('WeChat Pay')
+  expect(screen.getByRole('combobox', { name: 'Payment type 2' })).toHaveValue(
+    'WeChat Pay'
+  )
   await user.click(screen.getByRole('button', { name: 'Save payment channel' }))
   await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1))
   expect(vi.mocked(api.post).mock.calls[0][1]).toMatchObject({
@@ -130,8 +130,8 @@ test('editing a BEpusdt channel retains BSC and TRC methods without requiring it
   await user.click(
     await screen.findByRole('button', { name: 'Edit USDT gateway' })
   )
-  expect(screen.getByLabelText('Payment type 1')).toHaveValue('usdt.bep20')
-  expect(screen.getByLabelText('Payment type 2')).toHaveValue('usdt.trc20')
+  expect(screen.getAllByLabelText('Payment type')[0]).toHaveValue('usdt.bep20')
+  expect(screen.getAllByLabelText('Payment type')[1]).toHaveValue('usdt.trc20')
   expect(screen.getByLabelText('API key')).not.toBeRequired()
   await user.click(screen.getByRole('button', { name: 'Save payment channel' }))
   await waitFor(() =>

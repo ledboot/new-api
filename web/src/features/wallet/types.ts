@@ -102,6 +102,12 @@ export interface PaymentMethod {
   type: string
   /** Legacy optional color for UI display */
   color?: string
+  /** Estimated price per USD of wallet credit in the channel currency */
+  unit_price_local?: number
+  /** Exchange rate used for the estimate; 1 for USD channels */
+  fx_rate?: number
+  fee_percent?: number
+  fee_fixed?: number
   /** Minimum topup amount for this payment method */
   min_topup?: number
   /** Optional react-icons component name or safe icon URL */

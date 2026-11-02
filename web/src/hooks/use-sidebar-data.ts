@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   Activity,
+  ArrowLeftRight,
   HeartPulse,
   Box,
   ClipboardList,
@@ -148,6 +149,12 @@ export function useSidebarData(): SidebarData {
             title: t('Channels'),
             url: '/channels',
             icon: Radio,
+          },
+          {
+            title: t('Exchange Rate'),
+            url: '/fx-settings',
+            icon: ArrowLeftRight,
+            requiredRole: ROLE.SUPER_ADMIN,
           },
           {
             title: t('Models'),

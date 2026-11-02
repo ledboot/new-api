@@ -153,6 +153,8 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"PUT /api/option/":                                           accessTokenScopeRule("option:write"),
 	"PUT /api/option/passkey/domains":                            accessTokenScopeRule("option:write"),
 	"GET /api/option/model_pricing":                              accessTokenScopeRule("option:read"),
+	"GET /api/option/fx/status":                                  accessTokenScopeRule("option:read"),
+	"POST /api/option/fx/refresh":                                accessTokenScopeRule("option:write"),
 	"PATCH /api/option/model_pricing":                            accessTokenScopeRule("option:write"),
 	"POST /api/option/model_pricing/convert":                     accessTokenScopeRule("option:read"),
 	"POST /api/option/model_pricing/preview":                     accessTokenScopeRule("option:read"),

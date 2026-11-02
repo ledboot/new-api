@@ -41,6 +41,7 @@ import {
   useCreemPayment,
   useWaffoPayment,
   useWaffoPancakePayment,
+  useChannelQuote,
 } from './hooks'
 import {
   getDefaultPaymentType,
@@ -150,6 +151,8 @@ export function Wallet() {
     topupInfo?.pay_methods.find(
       (method) => method.type === getCurrentPaymentType()
     )
+
+  const channelQuote = useChannelQuote(currentMethod, topupAmount)
 
   let paymentCurrency = ''
   if (currentMethod?.currency) paymentCurrency = ` ${currentMethod.currency}`
@@ -324,6 +327,8 @@ export function Wallet() {
                   topupLink={topupInfo?.topup_link}
                   loading={topupLoading}
                   paymentCurrency={paymentCurrency}
+                  channelQuote={channelQuote.data ?? null}
+                  channelQuoteLoading={channelQuote.isFetching}
                   priceRatio={
                     currentMethod?.unit_price ??
                     (getCurrentPaymentType() === PAYMENT_TYPES.BEPUSDT

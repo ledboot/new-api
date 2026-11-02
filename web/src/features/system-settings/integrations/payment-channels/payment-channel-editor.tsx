@@ -361,7 +361,7 @@ export function PaymentChannelEditor(props: {
             <div className='space-y-2'>
               <Label>{t('Payment callback URL')}</Label>
               <div className='flex min-w-0 items-center gap-2'>
-                <code className='min-w-0 break-all text-xs'>
+                <code className='min-w-0 text-xs break-all'>
                   {props.item.notify_url}
                 </code>
                 <CopyButton value={props.item.notify_url} />
@@ -405,7 +405,7 @@ export function PaymentChannelEditor(props: {
             <div key={method.id} className='space-y-4 rounded-lg border p-4'>
               <div className='flex items-center justify-between gap-2'>
                 <Label htmlFor={`method-enabled-${method.id}`}>
-                  {t('Enabled')} {index + 1}
+                  {t('Enabled')}
                 </Label>
                 <div className='flex items-center gap-2'>
                   <Switch
@@ -436,7 +436,7 @@ export function PaymentChannelEditor(props: {
               <div className='grid gap-4 sm:grid-cols-2'>
                 <div className='space-y-2'>
                   <Label htmlFor={`method-name-${method.id}`}>
-                    {t('Method name')} {index + 1}
+                    {t('Method name')}
                   </Label>
                   <Input
                     id={`method-name-${method.id}`}
@@ -450,9 +450,10 @@ export function PaymentChannelEditor(props: {
                 </div>
                 <div className='space-y-2'>
                   <Label htmlFor={`method-type-${method.id}`}>
-                    {t('Payment type')} {index + 1}
+                    {t('Payment type')}
                   </Label>
-                  {channel.provider === '502' || channel.provider === 'stripe' ? (
+                  {channel.provider === '502' ||
+                  channel.provider === 'stripe' ? (
                     <Combobox
                       id={`method-type-${method.id}`}
                       aria-label={`${t('Payment type')} ${index + 1}`}
@@ -491,9 +492,7 @@ export function PaymentChannelEditor(props: {
                   )}
                 </div>
                 <div className='space-y-2'>
-                  <Label>
-                    {t('Interaction mode')} {index + 1}
-                  </Label>
+                  <Label>{t('Interaction mode')}</Label>
                   <Combobox
                     aria-label={`${t('Interaction mode')} ${index + 1}`}
                     disabled={hosted}
@@ -518,7 +517,7 @@ export function PaymentChannelEditor(props: {
                     {channel.provider === 'creem'
                       ? t('Product price')
                       : t('Price per USD of wallet credit')}{' '}
-                    ({channel.currency}) {index + 1}
+                    ({channel.currency})
                   </Label>
                   <Input
                     id={`method-price-${method.id}`}
@@ -537,7 +536,7 @@ export function PaymentChannelEditor(props: {
                   <>
                     <div className='space-y-2'>
                       <Label htmlFor={`method-fee-percent-${method.id}`}>
-                        {t('Fee percentage (%)')} {index + 1}
+                        {t('Fee percentage (%)')}
                       </Label>
                       <Input
                         id={`method-fee-percent-${method.id}`}
@@ -555,7 +554,7 @@ export function PaymentChannelEditor(props: {
                     </div>
                     <div className='space-y-2'>
                       <Label htmlFor={`method-fee-fixed-${method.id}`}>
-                        {t('Fixed fee')} ({channel.currency}) {index + 1}
+                        {t('Fixed fee')} ({channel.currency})
                       </Label>
                       <Input
                         id={`method-fee-fixed-${method.id}`}
@@ -577,7 +576,7 @@ export function PaymentChannelEditor(props: {
                   <>
                     <div className='space-y-2'>
                       <Label htmlFor={`method-product-${method.id}`}>
-                        {t('Product ID')} {index + 1}
+                        {t('Product ID')}
                       </Label>
                       <Input
                         id={`method-product-${method.id}`}
@@ -592,7 +591,7 @@ export function PaymentChannelEditor(props: {
                     </div>
                     <div className='space-y-2'>
                       <Label htmlFor={`method-credit-${method.id}`}>
-                        {t('Wallet credit in USD')} {index + 1}
+                        {t('Wallet credit in USD')}
                       </Label>
                       <Input
                         id={`method-credit-${method.id}`}
@@ -614,7 +613,7 @@ export function PaymentChannelEditor(props: {
                   <>
                     <div className='space-y-2'>
                       <Label htmlFor={`method-min-${method.id}`}>
-                        {t('Minimum wallet credit in USD')} {index + 1}
+                        {t('Minimum wallet credit in USD')}
                       </Label>
                       <Input
                         id={`method-min-${method.id}`}
@@ -632,8 +631,7 @@ export function PaymentChannelEditor(props: {
                     </div>
                     <div className='space-y-2'>
                       <Label htmlFor={`method-max-${method.id}`}>
-                        {t('Maximum wallet credit in USD (0 for unlimited)')}{' '}
-                        {index + 1}
+                        {t('Maximum wallet credit in USD (0 for unlimited)')}
                       </Label>
                       <Input
                         id={`method-max-${method.id}`}

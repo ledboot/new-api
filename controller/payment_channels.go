@@ -116,31 +116,62 @@ func resolveChannelPayment(key string) (*model.PaymentChannel, *model.PaymentCha
 	return nil, nil, common.NewMessage("Payment method is unavailable")
 }
 
-func quoteChannelPayment(channel *model.PaymentChannel, method *model.PaymentChannelMethod, amount int64, group string) (decimal.Decimal, int, error) {
+// channelPaymentQuote is the full money breakdown of one top-up attempt, so the
+// checkout and the wallet estimate can show exactly what the gateway charges.
+type channelPaymentQuote struct {
+	Total      decimal.Decimal `json:"-"`
+	Subtotal   decimal.Decimal `json:"-"`
+	FeeAmount  decimal.Decimal `json:"-"`
+	FeePercent float64         `json:"-"`
+	FeeFixed   decimal.Decimal `json:"-"`
+	FxRate     decimal.Decimal `json:"-"`
+	Currency   string          `json:"-"`
+	Quota      int             `json:"-"`
+}
+
+// channelFxRate converts the USD price of wallet credit into the currency the
+// channel settles in. USD channels are charged as-is.
+func channelFxRate(currency string) (decimal.Decimal, error) {
+	trimmed := strings.TrimSpace(currency)
+	if trimmed == "" || strings.EqualFold(trimmed, "USD") {
+		return decimal.NewFromInt(1), nil
+	}
+	rate, err := service.GetFxRate(trimmed)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	if !(rate > 0) || math.IsNaN(rate) || math.IsInf(rate, 0) {
+		return decimal.Zero, common.NewMessage("The exchange rate is unavailable")
+	}
+	return decimal.NewFromFloat(rate), nil
+}
+
+func quoteChannelPayment(channel *model.PaymentChannel, method *model.PaymentChannelMethod, amount int64, group string) (channelPaymentQuote, error) {
+	quote := channelPaymentQuote{Currency: channel.Currency, FxRate: decimal.NewFromInt(1), FeeFixed: decimal.Zero}
 	if common.QuotaPerUnit <= 0 || math.IsNaN(common.QuotaPerUnit) || math.IsInf(common.QuotaPerUnit, 0) {
-		return decimal.Zero, 0, common.NewMessage("Invalid top-up amount")
+		return quote, common.NewMessage("Invalid top-up amount")
 	}
 	price, err := decimal.NewFromString(method.UnitPrice)
 	if err != nil || !price.IsPositive() {
-		return decimal.Zero, 0, common.NewMessage("Invalid payment price")
+		return quote, common.NewMessage("Invalid payment price")
 	}
 	var units decimal.Decimal
 	creditRatio := decimal.NewFromInt(1)
 	if channel.Provider == "creem" {
 		units, err = decimal.NewFromString(method.CreditAmount)
 		if err != nil {
-			return decimal.Zero, 0, err
+			return quote, err
 		}
 	} else {
 		if amount <= 0 || common.QuotaPerUnit <= 0 {
-			return decimal.Zero, 0, common.NewMessage("Invalid top-up amount")
+			return quote, common.NewMessage("Invalid top-up amount")
 		}
 		units = decimal.NewFromInt(amount)
 		if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
 			units = units.Div(decimal.NewFromFloat(common.QuotaPerUnit)).Floor()
 		}
 		if units.LessThan(decimal.NewFromInt(method.MinTopup)) || (method.MaxTopup > 0 && units.GreaterThan(decimal.NewFromInt(method.MaxTopup))) || units.GreaterThan(decimal.NewFromInt(1000000)) {
-			return decimal.Zero, 0, common.NewMessage("Top-up amount is outside this payment method's limits")
+			return quote, common.NewMessage("Top-up amount is outside this payment method's limits")
 		}
 		ratio := common.GetTopupGroupRatio(group)
 		if ratio == 0 {
@@ -151,30 +182,81 @@ func quoteChannelPayment(channel *model.PaymentChannel, method *model.PaymentCha
 			discount = 1
 		}
 		if ratio <= 0 || discount <= 0 || math.IsNaN(ratio) || math.IsInf(ratio, 0) || math.IsNaN(discount) || math.IsInf(discount, 0) {
-			return decimal.Zero, 0, common.NewMessage("Invalid payment price")
+			return quote, common.NewMessage("Invalid payment price")
 		}
 		if channel.LegacyProvider == "stripe" {
 			creditRatio = decimal.NewFromFloat(ratio)
 		}
-		price = units.Mul(price).Mul(decimal.NewFromFloat(ratio)).Mul(decimal.NewFromFloat(discount)).Round(2)
+		price = units.Mul(price).Mul(decimal.NewFromFloat(ratio)).Mul(decimal.NewFromFloat(discount))
+		fxRate, err := channelFxRate(channel.Currency)
+		if err != nil {
+			return quote, err
+		}
+		price = price.Mul(fxRate).Round(2)
+		quote.FxRate = fxRate
+		quote.Subtotal = price
 		// The surcharge is charged on top of the listed price; credited quota
 		// stays derived from the price alone.
 		feePercent, feeFixed, err := model.ChannelMethodFees(method)
 		if err != nil {
-			return decimal.Zero, 0, err
+			return quote, err
 		}
+		percentValue, _ := feePercent.Float64()
+		quote.FeePercent = percentValue
+		quote.FeeFixed = feeFixed
 		if !feePercent.IsZero() || !feeFixed.IsZero() {
 			price = price.Mul(decimal.NewFromInt(1).Add(feePercent.Div(decimal.NewFromInt(100)))).Add(feeFixed).Round(2)
 		}
+		quote.FeeAmount = price.Sub(quote.Subtotal)
 	}
 	quota, err := validateCreditedQuota(units.Mul(creditRatio).Mul(decimal.NewFromFloat(common.QuotaPerUnit)))
 	if err != nil {
-		return decimal.Zero, 0, err
+		return quote, err
 	}
 	if price.LessThan(decimal.RequireFromString("0.01")) || price.GreaterThan(decimal.NewFromInt(99999999)) {
-		return decimal.Zero, 0, common.NewMessage("Invalid payment amount")
+		return quote, common.NewMessage("Invalid payment amount")
 	}
-	return price, quota, nil
+	quote.Total = price
+	quote.Quota = quota
+	return quote, nil
+}
+
+// QuoteChannelPayment previews the amount a payment method charges without
+// creating an order, so the wallet can show the rate and fee breakdown before
+// the buyer commits.
+func QuoteChannelPayment(c *gin.Context) {
+	var request EpayRequest
+	if err := common.DecodeJson(http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10), &request); err != nil {
+		paymentError(c, common.NewMessage("Invalid parameters"))
+		return
+	}
+	channel, method, err := resolveChannelPayment(request.PaymentMethod)
+	if err != nil {
+		paymentError(c, err)
+		return
+	}
+	user, err := model.GetUserById(c.GetInt("id"), false)
+	if err != nil || user == nil {
+		paymentError(c, common.NewMessage("User does not exist"))
+		return
+	}
+	quote, err := quoteChannelPayment(channel, method, request.Amount, user.Group)
+	if err != nil {
+		paymentError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{
+		"payment_method": request.PaymentMethod,
+		"amount":         request.Amount,
+		"currency":       quote.Currency,
+		"fx_rate":        quote.FxRate.StringFixed(6),
+		"subtotal":       quote.Subtotal.StringFixed(2),
+		"fee_percent":    quote.FeePercent,
+		"fee_fixed":      quote.FeeFixed.StringFixed(2),
+		"fee_amount":     quote.FeeAmount.StringFixed(2),
+		"total":          quote.Total.StringFixed(2),
+		"quota":          quote.Quota,
+	})
 }
 
 func RequestChannelPayment(c *gin.Context) {
@@ -193,11 +275,12 @@ func RequestChannelPayment(c *gin.Context) {
 		paymentError(c, common.NewMessage("User does not exist"))
 		return
 	}
-	money, quota, err := quoteChannelPayment(channel, method, request.Amount, user.Group)
+	quote, err := quoteChannelPayment(channel, method, request.Amount, user.Group)
 	if err != nil {
 		paymentError(c, err)
 		return
 	}
+	money, quota := quote.Total, quote.Quota
 	if err := model.ValidateTopUpQuotaCapacity(user.Id, quota); err != nil {
 		paymentError(c, err)
 		return
@@ -295,9 +378,21 @@ func channelWalletMethods(group string) ([]map[string]string, map[string]bool, e
 			if icon == "" && channel.Provider == "bepusdt" {
 				icon = "SiTether"
 			}
+			// The wallet needs the local-currency estimate and the surcharge to
+			// show the same breakdown the checkout will charge.
+			fxRate, err := channelFxRate(channel.Currency)
+			if err != nil {
+				fxRate = decimal.NewFromInt(1)
+			}
+			feePercent, feeFixed, err := model.ChannelMethodFees(&method)
+			if err != nil {
+				feePercent, feeFixed = decimal.Zero, decimal.Zero
+			}
+			localPrice := price.Mul(fxRate)
 			methods = append(methods, map[string]string{"name": method.Name, "type": channelPaymentKey(channel.ID, method.ID), "icon": icon,
 				"provider": channel.Provider, "channel_name": channel.Name, "currency": channel.Currency, "interaction": method.Interaction,
-				"min_topup": min.String(), "fixed_amount": fixed, "unit_price": price.String()})
+				"min_topup": min.String(), "fixed_amount": fixed, "unit_price": price.String(), "unit_price_local": localPrice.String(),
+				"fx_rate": fxRate.StringFixed(6), "fee_percent": feePercent.String(), "fee_fixed": feeFixed.String()})
 		}
 	}
 	return methods, migrated, nil
