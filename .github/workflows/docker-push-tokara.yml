@@ -1,0 +1,75 @@
+name: Publish tokara image
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to push to ledboot/tokara (e.g. v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-push-tokara-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: Build image (linux/amd64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      IMAGE: ledboot/tokara
+      PUSH: ${{ github.event_name == 'workflow_dispatch' }}
+      INPUT_TAG: ${{ inputs.tag }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 1
+
+      - name: Resolve image tag
+        id: version
+        run: |
+          if [ "$PUSH" = "true" ]; then
+            TAG="$INPUT_TAG"
+          else
+            TAG="pr-$PR_NUMBER"
+          fi
+          if ! printf '%s' "$TAG" | grep -Eq '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$'; then
+            echo "::error::Invalid Docker tag '$TAG'"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Image: $IMAGE:$TAG (push=$PUSH)"
+
+      - name: Write VERSION
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: echo "$TAG" > VERSION
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to Docker Hub
+        if: env.PUSH == 'true'
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4 # v4.3.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ env.PUSH == 'true' }}
+          tags: ${{ env.IMAGE }}:${{ steps.version.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
