@@ -24,6 +24,19 @@ func TestChannelDefaultBaseURLsRequireReadPermission(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, recorder.Code)
 }
 
+func TestChannelListAcceptsBarePathWithSiblingRoute(t *testing.T) {
+	assertChannelRoutePermission(t, http.MethodGet, "", authz.ChannelRead, controller.GetAllChannels)
+
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	// A sibling of /api/channel suppresses gin's trailing-slash redirect, which the console relies on.
+	engine.GET("/api/channel_status", func(c *gin.Context) { c.Status(http.StatusOK) })
+	registerChannelRoutes(engine.Group("/api"))
+	recorder := httptest.NewRecorder()
+	engine.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/channel?p=1&page_size=20", nil))
+	assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+}
+
 func TestChannelStatusRoutesUseExpectedPermissions(t *testing.T) {
 	assertChannelRoutePermission(t, http.MethodGet, "/priority/order", authz.ChannelRead, controller.GetChannelPriorityOrder)
 	assertChannelRoutePermission(t, http.MethodPost, "/priority/reorder", authz.ChannelWrite, controller.ReorderChannelPriority)
