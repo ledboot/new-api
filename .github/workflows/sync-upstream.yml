@@ -57,5 +57,5 @@ jobs:
       - name: Report conflict
         if: steps.sync.outputs.status == 'conflict'
         run: |
-          echo "::error::upstream/main conflicts with main. Run './scripts/sync-upstream.sh' locally, resolve, then push."
+          echo "::error::upstream/main conflicts with main. Locally: git fetch upstream && git merge upstream/main, resolve, then push. Conflicts are listed in the job log above."
           exit 1
