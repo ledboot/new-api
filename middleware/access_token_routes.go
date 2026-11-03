@@ -168,6 +168,7 @@ var accessTokenRouteRules = map[string]accessTokenRouteRule{
 	"POST /api/option/payment_channels":                          accessTokenScopeRule("option:write"),
 	"DELETE /api/option/payment_channels/:id":                    accessTokenScopeRule("option:write"),
 	"POST /api/option/fx/refresh":                                accessTokenScopeRule("option:write"),
+	"GET /api/option/model_pricing/issues":                       accessTokenScopeRule("option:read"),
 	"PATCH /api/option/model_pricing":                            accessTokenScopeRule("option:write"),
 	"POST /api/option/model_pricing/convert":                     accessTokenScopeRule("option:read"),
 	"POST /api/option/model_pricing/preview":                     accessTokenScopeRule("option:read"),
