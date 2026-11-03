@@ -1,6 +1,6 @@
 <div align="center">
 
-![new-api](/web/public/logo.png)
+![Tokara](/web/public/tokara-logo.webp)
 
 # New API
 
