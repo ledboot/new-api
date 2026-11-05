@@ -955,6 +955,7 @@ func TestOpenLuxSalesPublishAndBillingDatabaseMatrix(t *testing.T) {
 			response = modelManagementRequest(t, publishHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/publish", request, nil)
 			assert.Equal(t, http.StatusConflict, response.Code)
 			payload = strings.ReplaceAll(payload, `"step_size":1000000`, `"step_size":2000000`)
+			payload = strings.Replace(payload, `],"vendors":`, `,{"model_name":"sync-added","quota_type":0,"model_ratio":1,"completion_ratio":2,"enable_groups":["sale-a","sale-b"],"supported_endpoint_types":["openai"]}],"vendors":`, 1)
 			_, _, version, err = fetchOpenLuxCatalog(context.Background())
 			require.NoError(t, err)
 			request.Version = version
@@ -964,6 +965,10 @@ func TestOpenLuxSalesPublishAndBillingDatabaseMatrix(t *testing.T) {
 			request.Groups[1].GroupRatio = new(0.4)
 			request.Groups[0].APIKey = ""
 			request.Groups[1].APIKey = ""
+			overrides := map[string]string{"sale-a": `{"group":"sale-a"}`, "sale-b": `{"group":"sale-b","temperature":0.4}`}
+			for group, override := range overrides {
+				require.NoError(t, db.Model(&model.Channel{}).Where("id = ?", published.Data.Channels[group]).Update("param_override", override).Error)
+			}
 			response = modelManagementRequest(t, previewHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/preview", request, &preview)
 			require.True(t, preview.Success, response.Body.String())
 			request.PreviewVersion = preview.Data.PreviewVersion
@@ -974,6 +979,18 @@ func TestOpenLuxSalesPublishAndBillingDatabaseMatrix(t *testing.T) {
 			response = modelManagementRequest(t, publishHandler, http.MethodPost, "/api/ratio_sync/openlux/sales/publish", request, &updated)
 			require.True(t, updated.Success, response.Body.String())
 			assert.Equal(t, published.Data.Channels, updated.Data.Channels)
+			for group, override := range overrides {
+				var channel model.Channel
+				require.NoError(t, db.First(&channel, updated.Data.Channels[group]).Error)
+				require.NotNil(t, channel.ParamOverride)
+				assert.Equal(t, override, *channel.ParamOverride)
+				assert.Contains(t, channel.GetModels(), "sync-added")
+				var ability model.Ability
+				require.NoError(t, db.Where("channel_id = ? AND model = ?", channel.Id, "sync-added").First(&ability).Error)
+				price, _, managed := billing_setting.GetOpenLuxSalePrice(group, "sync-added")
+				assert.True(t, managed)
+				assert.NotEmpty(t, price.Expression)
+			}
 			assert.Equal(t, 0.15, ratio_setting.GetGroupRatio("sale-a"))
 			assert.Equal(t, 0.4, ratio_setting.GetGroupRatio("sale-b"))
 			assert.Zero(t, common.GetTopupGroupRatio("sale-a"))

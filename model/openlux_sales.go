@@ -263,7 +263,7 @@ func PublishOpenLuxSales(plan OpenLuxSalesPlan, keys map[string]string, metadata
 				if err := lockForUpdate(tx).First(&channel, previous.ChannelID).Error; err != nil {
 					return ErrOpenLuxSalesConflict
 				}
-				if channel.Group != group.Group || strings.TrimRight(channel.GetBaseURL(), "/") != "https://www.openlux.ai" || channel.Type != 1 || channel.GetModelMapping() != "" || len(channel.GetParamOverride()) != 0 || len(channel.GetHeaderOverride()) != 0 {
+				if channel.Group != group.Group || strings.TrimRight(channel.GetBaseURL(), "/") != "https://www.openlux.ai" || channel.Type != 1 || channel.GetModelMapping() != "" || len(channel.GetHeaderOverride()) != 0 {
 					return ErrOpenLuxSalesConflict
 				}
 			}
