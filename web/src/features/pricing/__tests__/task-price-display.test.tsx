@@ -968,13 +968,22 @@ it('renders only group pricing and inline API endpoint rows without overview tab
           ...model,
           billing_usage_schema: undefined,
           billing_expr: 'tier("tier_1", p * 1 + c * 5)',
-          supported_endpoint_types: ['openai', 'unknown'],
+          supported_endpoint_types: [
+            'anthropic',
+            'openai',
+            'anthropic',
+            'unknown',
+          ],
+          supported_endpoint: {
+            anthropic: { method: 'POST', path: '/v1/messages' },
+            openai: { method: 'POST', path: '/v1/chat/completions' },
+          },
         }}
         groupRatio={{ default: 1 }}
         usableGroup={{ default: { desc: '', ratio: 1 } }}
         endpointMap={{
-          anthropic: { method: 'POST', path: '/v1/messages' },
-          openai: { method: 'POST', path: '/v1/chat/completions' },
+          anthropic: { method: 'POST', path: '/inferred/messages' },
+          openai: { method: 'POST', path: '/inferred/chat' },
         }}
         autoGroups={[]}
         priceRate={1}
@@ -1017,4 +1026,77 @@ it('renders only group pricing and inline API endpoint rows without overview tab
     .setup()
     .click(within(row).getByRole('button', { name: 'Copy endpoint path' }))
   expect(await navigator.clipboard.readText()).toBe('/v1/messages')
+})
+
+it.each<{
+  types: string[]
+  source: PricingModel['supported_endpoint']
+  expected: string[]
+}>([
+  { types: ['openai'], source: undefined, expected: [] },
+  { types: ['openai'], source: null, expected: [] },
+  {
+    types: ['openai'],
+    source: { openai: { path: '/catalog/chat' } },
+    expected: [],
+  },
+  {
+    types: ['openai'],
+    source: { openai: { method: 'POST' } },
+    expected: [],
+  },
+  {
+    types: ['anthropic', 'openai', 'anthropic'],
+    source: {
+      anthropic: { method: 'POST', path: '/catalog/messages' },
+      openai: { method: 'GET', path: '/catalog/{model}/chat' },
+    },
+    expected: ['/catalog/messages', '/catalog/test-plugin-model/chat'],
+  },
+  { types: ['unknown'], source: undefined, expected: [] },
+  { types: ['openai'], source: {}, expected: [] },
+  { types: [], source: undefined, expected: [] },
+])('renders only declared endpoint definitions for $types', (testCase) => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { groups: [], summary: null } },
+  })
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  clients.push(client)
+  render(
+    <QueryClientProvider client={client}>
+      <ModelDetailsContent
+        model={{
+          ...model,
+          model_name: 'test-plugin-model',
+          supported_endpoint_types: testCase.types,
+          supported_endpoint: testCase.source,
+        }}
+        groupRatio={{ default: 1 }}
+        usableGroup={{ default: { desc: '', ratio: 1 } }}
+        endpointMap={{ openai: { method: 'GET', path: '/catalog/chat' } }}
+        autoGroups={[]}
+        priceRate={1}
+        usdExchangeRate={1}
+        tokenUnit='M'
+      />
+    </QueryClientProvider>
+  )
+  if (!testCase.expected.length) {
+    expect(screen.queryByRole('heading', { name: 'API Endpoints' })).toBeNull()
+    return
+  }
+  const section = screen
+    .getByRole('heading', { name: 'API Endpoints' })
+    .closest('section') as HTMLElement
+  expect(within(section).getAllByRole('listitem')).toHaveLength(
+    testCase.expected.length
+  )
+  for (const path of testCase.expected) {
+    expect(within(section).getByText(path)).toBeVisible()
+  }
+  expect(within(section).getByText('GET')).toBeVisible()
+  expect(within(section).queryByText('/v1/messages')).toBeNull()
+  expect(within(section).queryByText('/v1/chat/completions')).toBeNull()
 })

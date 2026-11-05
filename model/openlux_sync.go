@@ -4,12 +4,56 @@ import (
 	"errors"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 // OpenLuxSnapshotOption is an internal source checkpoint, never a runtime setting.
 const OpenLuxSnapshotOption = "OpenLuxCatalogSnapshot"
+
+type openLuxModelEndpoints struct {
+	Types     []constant.EndpointType
+	Endpoints map[string]common.EndpointInfo
+}
+
+// Endpoint declarations are display data from the last successful source sync.
+// They never configure relay routes or overwrite administrator model metadata.
+func loadOpenLuxModelEndpoints() (map[string]openLuxModelEndpoints, error) {
+	saved, err := LoadOpenLuxSnapshot()
+	if err != nil || saved == "" {
+		return nil, err
+	}
+	var snapshot struct {
+		Catalog struct {
+			Models []struct {
+				Name  string                  `json:"model_name"`
+				Types []constant.EndpointType `json:"supported_endpoint_types"`
+			} `json:"data"`
+			Endpoints map[string]common.EndpointInfo `json:"supported_endpoint"`
+		} `json:"catalog"`
+	}
+	if err := common.UnmarshalJsonStr(saved, &snapshot); err != nil {
+		return nil, err
+	}
+	result := make(map[string]openLuxModelEndpoints, len(snapshot.Catalog.Models))
+	for _, item := range snapshot.Catalog.Models {
+		if item.Types == nil {
+			continue
+		}
+		declaration := openLuxModelEndpoints{Types: item.Types}
+		if snapshot.Catalog.Endpoints != nil {
+			declaration.Endpoints = make(map[string]common.EndpointInfo, len(item.Types))
+			for _, endpoint := range item.Types {
+				if info, ok := snapshot.Catalog.Endpoints[string(endpoint)]; ok {
+					declaration.Endpoints[string(endpoint)] = info
+				}
+			}
+		}
+		result[item.Name] = declaration
+	}
+	return result, nil
+}
 
 func LoadOpenLuxSnapshot() (string, error) {
 	var option Option

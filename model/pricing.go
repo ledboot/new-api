@@ -55,6 +55,7 @@ type Pricing struct {
 	AudioCompletionRatio      *float64                             `json:"audio_completion_ratio,omitempty"`
 	EnableGroup               []string                             `json:"enable_groups"`
 	SupportedEndpointTypes    []constant.EndpointType              `json:"supported_endpoint_types"`
+	SupportedEndpoint         map[string]common.EndpointInfo       `json:"supported_endpoint"`
 	BillingMode               string                               `json:"billing_mode,omitempty"`
 	BillingExpr               string                               `json:"billing_expr,omitempty"`
 	BillingUsageSchema        map[string]jsplugin.UsageFieldSchema `json:"billing_usage_schema,omitempty"`
@@ -341,6 +342,10 @@ func updatePricing() {
 		officialPrices = map[string]OfficialPrice{}
 	}
 
+	upstreamEndpoints, err := loadOpenLuxModelEndpoints()
+	if err != nil {
+		common.SysLog(common.LogText("load OpenLux endpoint catalog error: %v", err))
+	}
 	pricingMap = make([]Pricing, 0)
 	pluginGeneration := jsplugin.DefaultRegistry.Generation()
 	for model, groups := range modelGroupsMap {
@@ -350,6 +355,10 @@ func updatePricing() {
 			GroupInputTokenLimits:  billing_setting.GetOpenLuxModelInputLimits(model),
 			EnableGroup:            groups.Items(),
 			SupportedEndpointTypes: modelSupportEndpointTypes[model],
+		}
+		if declared, ok := upstreamEndpoints[model]; ok {
+			pricing.SupportedEndpointTypes = declared.Types
+			pricing.SupportedEndpoint = declared.Endpoints
 		}
 
 		// 补充模型元数据（描述、标签、供应商、状态）

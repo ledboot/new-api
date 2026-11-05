@@ -59,7 +59,13 @@ func openLuxCatalogEntries(catalog *openLuxCatalog) [3]map[string]string {
 		return entries
 	}
 	for _, item := range catalog.Models {
-		encoded, _ := common.Marshal(item) // typed upstream data has already decoded finite JSON numbers
+		endpoints := make(map[string]common.EndpointInfo, len(item.Endpoints))
+		for _, endpoint := range item.Endpoints {
+			if info, ok := catalog.SupportedEndpoint[endpoint]; ok {
+				endpoints[endpoint] = info
+			}
+		}
+		encoded, _ := common.Marshal([]any{item, endpoints}) // typed upstream data has already decoded finite JSON numbers
 		entries[0][item.Name] = fmt.Sprintf("%x", sha256.Sum256(encoded))
 	}
 	for name, label := range catalog.Groups {
@@ -144,5 +150,9 @@ func (openLuxSyncHandler) Run(ctx context.Context, task *model.SystemTask, runne
 	// Never mutate model metadata, gateway channel models, or selling prices.
 	if finishErr := model.FinishOpenLuxSync(task.TaskID, runnerID, string(checkpoint), result, err); finishErr != nil {
 		common.SysLog(common.LogText("system task %s failed to persist result: %v", task.TaskID, finishErr))
+		return
+	}
+	if err == nil {
+		model.InvalidatePricingCache()
 	}
 }

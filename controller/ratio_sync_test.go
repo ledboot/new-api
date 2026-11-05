@@ -605,6 +605,69 @@ func TestOpenLuxScheduledSyncDatabaseMatrix(t *testing.T) {
 	}
 }
 
+func TestOpenLuxCatalogEndpointsInPricingDatabaseMatrix(t *testing.T) {
+	type endpointPricing struct {
+		ModelName string                         `json:"model_name"`
+		Types     []string                       `json:"supported_endpoint_types"`
+		Endpoints map[string]common.EndpointInfo `json:"supported_endpoint"`
+	}
+	for _, dialect := range []struct{ kind, env string }{{"sqlite", ""}, {"mysql", "TEST_MYSQL_DSN"}, {"postgres", "TEST_POSTGRES_DSN"}} {
+		t.Run(dialect.kind, func(t *testing.T) {
+			if dialect.env != "" && os.Getenv(dialect.env) == "" {
+				t.Skip("set " + dialect.env + " to run this database")
+			}
+			db := modelManagementDB(t, dialect.kind, os.Getenv(dialect.env))
+			require.NoError(t, db.AutoMigrate(&model.SystemTask{}, &model.SystemTaskLock{}))
+			channel := model.Channel{Name: "OpenLux", Key: "fixture", Type: 1, Status: 1, Models: "claude-opus-5-5,local-only", Group: "default"}
+			require.NoError(t, channel.Insert())
+			model.InitChannelCache()
+			model.RefreshPricing()
+			inferred := slices.Clone(model.GetModelSupportEndpointTypes("claude-opus-5-5"))
+			path := "/v1/messages"
+			status := http.StatusOK
+			openLuxTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(status)
+				encoded, err := common.Marshal(map[string]any{
+					"success":            true,
+					"data":               []map[string]any{{"model_name": "claude-opus-5-5", "supported_endpoint_types": []string{"anthropic"}}},
+					"group_ratio":        map[string]float64{"paid": 1},
+					"supported_endpoint": map[string]common.EndpointInfo{"anthropic": {Path: path, Method: "POST"}, "openai": {Path: "/unused", Method: "POST"}},
+				})
+				require.NoError(t, err)
+				_, _ = w.Write(encoded)
+			})
+			for _, endpointPath := range []string{"/v1/messages", "/v2/messages"} {
+				path = endpointPath
+				task := runOpenLuxScheduledTask(t, context.Background())
+				require.Equal(t, model.SystemTaskStatusSucceeded, task.Status, task.Error)
+				var result openLuxSyncResult
+				require.NoError(t, common.UnmarshalJsonStr(task.Result, &result))
+				assert.True(t, result.Changed, "endpoint path updates are catalog changes")
+				encoded, err := common.Marshal(model.GetPricing())
+				require.NoError(t, err)
+				var pricing []endpointPricing
+				require.NoError(t, common.Unmarshal(encoded, &pricing))
+				index := slices.IndexFunc(pricing, func(item endpointPricing) bool { return item.ModelName == "claude-opus-5-5" })
+				require.NotEqual(t, -1, index)
+				assert.Equal(t, []string{"anthropic"}, pricing[index].Types)
+				assert.Equal(t, map[string]common.EndpointInfo{"anthropic": {Path: path, Method: "POST"}}, pricing[index].Endpoints)
+				local := slices.IndexFunc(pricing, func(item endpointPricing) bool { return item.ModelName == "local-only" })
+				require.NotEqual(t, -1, local)
+				assert.Equal(t, []string{"openai"}, pricing[local].Types)
+				assert.Nil(t, pricing[local].Endpoints, "models absent upstream retain local endpoint definitions")
+				assert.Equal(t, inferred, model.GetModelSupportEndpointTypes("claude-opus-5-5"), "catalog display must not change relay capabilities")
+			}
+			status = http.StatusServiceUnavailable
+			task := runOpenLuxScheduledTask(t, context.Background())
+			assert.Equal(t, model.SystemTaskStatusFailed, task.Status)
+			model.RefreshPricing()
+			encoded, err := common.Marshal(model.GetPricing())
+			require.NoError(t, err)
+			assert.Contains(t, string(encoded), "/v2/messages", "upstream failure preserves the last successful endpoint catalog")
+		})
+	}
+}
+
 func TestOpenLuxScheduledChangesIncludeRemovalsAndMetadata(t *testing.T) {
 	before := &openLuxCatalog{
 		Models: []openLuxModel{{Name: "old"}, {Name: "stable", Ratio: new(1.0)}, {Name: "fixed", QuotaType: new(1), Price: new(0.1)}, {Name: "video", QuotaType: new(4), VideoResolutionRatios: map[string]float64{"720p": 1}}},
@@ -1114,6 +1177,7 @@ func TestOpenLuxCatalogVersionTracksPricesInsteadOfPresentation(t *testing.T) {
 	catalog.Models[0].Endpoints = []string{"anthropic", "openai"}
 	catalog.Models[0].Groups = []string{"b", "a"}
 	catalog.Models[0].Description = "Updated model description"
+	catalog.SupportedEndpoint = map[string]common.EndpointInfo{"openai": {Path: "/display-only/chat", Method: "POST"}}
 	catalog.Groups["a"] = "Updated group label"
 	catalog.Vendors = []openLuxVendor{{ID: 1, Name: "Updated vendor"}}
 	slices.Reverse(catalog.Models)

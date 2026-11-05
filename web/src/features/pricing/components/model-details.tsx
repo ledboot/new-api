@@ -1103,10 +1103,7 @@ function ProviderGroupPricingSection(
       targetField =
         officialSummary.unit === 'request' ? 'fixedPrice' : 'inputPrice'
     }
-    const deltaByGroupTier = new Map<
-      string,
-      Map<DynamicPricingTier, number>
-    >()
+    const deltaByGroupTier = new Map<string, Map<DynamicPricingTier, number>>()
     if (officialSummary && targetField) {
       for (const { group, tiers } of tierGroups) {
         const ratio = getConfiguredGroupRatio(props.groupRatio, group)
@@ -1462,10 +1459,7 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
     <div className='@container/details space-y-6'>
       <ModelHeader model={props.model} />
       <ModelBackendDetailsSection model={props.model} />
-      <ModelEndpointSection
-        model={props.model}
-        endpointMap={props.endpointMap}
-      />
+      <ModelEndpointSection model={props.model} />
       {hasPerformance && summary && <OverviewSummaryGrid summary={summary} />}
       <GroupPricingSection
         model={props.model}
@@ -1481,41 +1475,21 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
   )
 }
 
-function ModelEndpointSection(props: {
-  model: PricingModel
-  endpointMap: Record<string, { path?: string; method?: string }>
-}) {
+function ModelEndpointSection(props: { model: PricingModel }) {
   const { t } = useTranslation()
-  const supported = [...new Set(props.model.supported_endpoint_types ?? [])]
-  const hasChat = supported.some(
-    (type) => type === 'openai' || type === 'anthropic'
-  )
-  // The gateway converts chat requests between these two public wire formats.
-  const types = hasChat
-    ? [
-        'anthropic',
-        'openai',
-        ...supported.filter(
-          (type) => type !== 'anthropic' && type !== 'openai'
-        ),
-      ]
-    : supported
-  const standard: Record<string, { method: string; path: string }> = {
-    anthropic: { method: 'POST', path: '/v1/messages' },
-    openai: { method: 'POST', path: '/v1/chat/completions' },
-  }
+  const types = [...new Set(props.model.supported_endpoint_types ?? [])]
   const labels: Record<string, string> = {
     anthropic: 'Anthropic',
     openai: 'OpenAI',
   }
   const endpoints = types.flatMap((type) => {
-    const info = standard[type] ?? props.endpointMap[type]
-    if (!info?.path) return []
+    const info = props.model.supported_endpoint?.[type]
+    if (!info?.path || !info.method) return []
     return [
       {
         type,
         label: labels[type] ?? type,
-        method: (info.method || 'POST').toUpperCase(),
+        method: info.method.toUpperCase(),
         path: replaceModelInPath(info.path, props.model.model_name),
       },
     ]

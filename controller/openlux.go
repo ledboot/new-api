@@ -83,13 +83,14 @@ type openLuxVendor struct {
 type openLuxCatalog struct {
 	// Raw retains provider fields that are not yet supported for local billing.
 	// It is returned only by the administrator catalog endpoint, never imported as pricing.
-	Raw         map[string]json.RawMessage    `json:"-"`
-	Success     bool                          `json:"success"`
-	Models      []openLuxModel                `json:"data"`
-	Vendors     []openLuxVendor               `json:"vendors"`
-	Groups      map[string]string             `json:"usable_group"`
-	Ratios      map[string]float64            `json:"group_ratio"`
-	ModelRatios map[string]map[string]float64 `json:"group_model_ratio"`
+	Raw               map[string]json.RawMessage     `json:"-"`
+	Success           bool                           `json:"success"`
+	Models            []openLuxModel                 `json:"data"`
+	Vendors           []openLuxVendor                `json:"vendors"`
+	Groups            map[string]string              `json:"usable_group"`
+	Ratios            map[string]float64             `json:"group_ratio"`
+	ModelRatios       map[string]map[string]float64  `json:"group_model_ratio"`
+	SupportedEndpoint map[string]common.EndpointInfo `json:"supported_endpoint,omitempty"`
 }
 
 type openLuxAccount struct {
@@ -202,6 +203,7 @@ func fetchOpenLuxCatalog(ctx context.Context) (*openLuxCatalog, *openLuxAccount,
 	// OpenLux changes endpoint array order between requests without changing prices.
 	pricing := catalog
 	pricing.Raw, pricing.Vendors = nil, nil
+	pricing.SupportedEndpoint = nil // Display paths do not change the reviewed price contract.
 	pricing.Groups = make(map[string]string, len(catalog.Groups))
 	for name := range catalog.Groups {
 		pricing.Groups[name] = ""
