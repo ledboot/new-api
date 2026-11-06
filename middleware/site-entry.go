@@ -46,7 +46,7 @@ func SiteEntryChallenge(c *gin.Context) bool {
 		c.Status(http.StatusMethodNotAllowed)
 		return true
 	}
-	origin, _ := siteEntryOrigin(settings.serverAddress, c.Request.Host)
+	origin, hostname := siteEntryOrigin(settings.serverAddress, c.Request.Host)
 	if origin == "" || settings.siteKey == "" || settings.secretKey == "" {
 		c.String(http.StatusServiceUnavailable, i18n.T(c, i18n.MsgSiteEntryUnavailable))
 		return true
@@ -68,6 +68,10 @@ func SiteEntryChallenge(c *gin.Context) bool {
 	}
 	if err := siteEntryPage.Execute(&page, map[string]string{
 		"Lang":        lang,
+		"Hostname":    hostname,
+		"RayID":       c.GetHeader("CF-Ray"),
+		"Provider":    i18n.T(c, i18n.MsgSiteEntryProvider),
+		"Privacy":     i18n.T(c, i18n.MsgSiteEntryPrivacy),
 		"Nonce":       nonce,
 		"SiteKey":     settings.siteKey,
 		"Action":      siteEntryAction,

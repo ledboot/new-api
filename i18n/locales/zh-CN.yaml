@@ -93,8 +93,10 @@ channel.upstream_update_removed_models: "删除模型示例（展示 {{.Shown}}/
 channel.upstream_update_failed_channels: "失败渠道 ID（展示 {{.Shown}}/{{.Total}}）：{{.Ids}}"
 channel.upstream_update_more_omitted: "（其余 {{.Count}} 个已省略）"
 
-site_entry.title: "人机验证"
-site_entry.description: "完成安全验证后即可访问网站。"
+site_entry.title: "正在进行安全验证"
+site_entry.description: "本网站使用安全服务防护恶意自动程序。验证您的浏览器期间，将显示此页面。"
+site_entry.provider: "安全验证由 Cloudflare 提供"
+site_entry.privacy: "隐私"
 site_entry.error: "暂时无法完成验证，请重试。"
 site_entry.retry: "重试"
 site_entry.no_script: "请启用 JavaScript 以完成验证。"

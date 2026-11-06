@@ -5,29 +5,96 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Title}}</title>
   <style nonce="{{.Nonce}}">
-    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
-    body { margin: 0; min-height: 100dvh; display: grid; place-items: center; }
-    main { width: min(24rem, calc(100% - 2rem)); padding: 1.5rem; box-sizing: border-box; border: 1px solid GrayText; border-radius: 1rem; }
-    h1 { margin: 0; font-size: 1.35rem; }
-    button { font: inherit; padding: .5rem .75rem; cursor: pointer; }
+    :root {
+      color-scheme: light;
+      color: #313131;
+      background: #fff;
+      font-family: system-ui, sans-serif;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0;
+    }
+    main, footer {
+      width: min(56rem, calc(100% - 3rem));
+      margin-inline: auto;
+    }
+    main {
+      flex: 1;
+      padding-block: clamp(3.5rem, 7vw, 8rem) 3rem;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 2.5rem);
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+    h2 { margin: .5rem 0; font-size: clamp(1.25rem, 3vw, 1.5rem); }
+    p { margin: 0; line-height: 1.5; }
+    .verification { margin-top: 2rem; }
+    #challenge { max-width: 25rem; }
+    #progress {
+      width: 1.25rem;
+      height: 1.25rem;
+      border: .25rem solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      #progress { animation: none; }
+    }
+    button {
+      margin-top: .75rem;
+      padding: .45rem .75rem;
+      font: inherit;
+      cursor: pointer;
+    }
+    footer {
+      border-top: 1px solid #dedede;
+      padding-block: 1rem;
+      font-size: .75rem;
+      text-align: center;
+    }
+    footer a { color: #2453b3; }
+    .separator { padding-inline: .35rem; }
   </style>
 </head>
 <body>
   <main>
-    <h1>{{.Title}}</h1>
+    <h1>{{.Hostname}}</h1>
+    <h2>{{.Title}}</h2>
     <p>{{.Description}}</p>
-    <div id="challenge" data-sitekey="{{.SiteKey}}" data-action="{{.Action}}"></div>
-    <div id="failure" hidden>
-      <p role="alert">{{.Error}}</p>
-      <button type="button" id="retry">{{.Retry}}</button>
+    <div class="verification">
+      <div id="progress" aria-hidden="true" hidden></div>
+      <div id="challenge" data-sitekey="{{.SiteKey}}" data-action="{{.Action}}"></div>
+      <div id="failure" hidden>
+        <p role="alert">{{.Error}}</p>
+        <button type="button" id="retry">{{.Retry}}</button>
+      </div>
+      <noscript>{{.NoScript}}</noscript>
     </div>
-    <noscript>{{.NoScript}}</noscript>
   </main>
+  <footer>
+    {{if .RayID}}<p>Ray ID: {{.RayID}}</p>{{end}}
+    <p>
+      <a href="https://www.cloudflare.com/products/turnstile/">{{.Provider}}</a>
+      <span class="separator" aria-hidden="true">|</span>
+      <a href="https://www.cloudflare.com/privacypolicy/">{{.Privacy}}</a>
+    </p>
+  </footer>
   <script nonce="{{.Nonce}}">
     const challenge = document.getElementById('challenge')
     const failure = document.getElementById('failure')
+    const progress = document.getElementById('progress')
+    progress.hidden = false
 
     function showFailure() {
+      progress.hidden = true
       challenge.hidden = true
       failure.hidden = false
     }
@@ -40,6 +107,11 @@
           sitekey: challenge.dataset.sitekey,
           action: challenge.dataset.action,
           size: 'flexible',
+          theme: 'light',
+          appearance: 'interaction-only',
+          'before-interactive-callback': () => { progress.hidden = true },
+          'after-interactive-callback': () => { progress.hidden = !failure.hidden },
+          'unsupported-callback': showFailure,
           retry: 'never',
           'error-callback': showFailure,
           'expired-callback': showFailure,

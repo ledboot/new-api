@@ -122,6 +122,8 @@ const (
 	MsgSiteEntryDescription = "site_entry.description"
 	MsgSiteEntryError       = "site_entry.error"
 	MsgSiteEntryRetry       = "site_entry.retry"
+	MsgSiteEntryProvider    = "site_entry.provider"
+	MsgSiteEntryPrivacy     = "site_entry.privacy"
 	MsgSiteEntryNoScript    = "site_entry.no_script"
 	MsgSiteEntryUnavailable = "site_entry.unavailable"
 )

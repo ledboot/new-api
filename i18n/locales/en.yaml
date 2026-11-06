@@ -92,8 +92,10 @@ channel.upstream_update_removed_models: "Removed model examples (showing {{.Show
 channel.upstream_update_failed_channels: "Failed channel IDs (showing {{.Shown}}/{{.Total}}): {{.Ids}}"
 channel.upstream_update_more_omitted: " ({{.Count}} more omitted)"
 
-site_entry.title: "Human verification"
-site_entry.description: "Complete the security check to continue to the website."
+site_entry.title: "Performing a security check"
+site_entry.description: "This website uses a security service to protect against automated traffic. This page is shown while we verify your browser."
+site_entry.provider: "Security verification by Cloudflare"
+site_entry.privacy: "Privacy"
 site_entry.error: "Verification could not be completed. Please try again."
 site_entry.retry: "Try again"
 site_entry.no_script: "Enable JavaScript to complete verification."
