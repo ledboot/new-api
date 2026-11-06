@@ -92,3 +92,10 @@ channel.upstream_update_added_models: "新增模型示例（展示 {{.Shown}}/{{
 channel.upstream_update_removed_models: "删除模型示例（展示 {{.Shown}}/{{.Total}}）：{{.Models}}"
 channel.upstream_update_failed_channels: "失败渠道 ID（展示 {{.Shown}}/{{.Total}}）：{{.Ids}}"
 channel.upstream_update_more_omitted: "（其余 {{.Count}} 个已省略）"
+
+site_entry.title: "人机验证"
+site_entry.description: "完成安全验证后即可访问网站。"
+site_entry.error: "暂时无法完成验证，请重试。"
+site_entry.retry: "重试"
+site_entry.no_script: "请启用 JavaScript 以完成验证。"
+site_entry.unavailable: "网站验证暂不可用。"

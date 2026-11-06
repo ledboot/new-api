@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}}</title>
+  <style nonce="{{.Nonce}}">
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { margin: 0; min-height: 100dvh; display: grid; place-items: center; }
+    main { width: min(24rem, calc(100% - 2rem)); padding: 1.5rem; box-sizing: border-box; border: 1px solid GrayText; border-radius: 1rem; }
+    h1 { margin: 0; font-size: 1.35rem; }
+    button { font: inherit; padding: .5rem .75rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>{{.Title}}</h1>
+    <p>{{.Description}}</p>
+    <div id="challenge" data-sitekey="{{.SiteKey}}" data-action="{{.Action}}"></div>
+    <div id="failure" hidden>
+      <p role="alert">{{.Error}}</p>
+      <button type="button" id="retry">{{.Retry}}</button>
+    </div>
+    <noscript>{{.NoScript}}</noscript>
+  </main>
+  <script nonce="{{.Nonce}}">
+    const challenge = document.getElementById('challenge')
+    const failure = document.getElementById('failure')
+
+    function showFailure() {
+      challenge.hidden = true
+      failure.hidden = false
+    }
+
+    document.getElementById('retry').onclick = () => window.location.reload()
+
+    window.renderSiteEntry = () => {
+      try {
+        window.turnstile.render(challenge, {
+          sitekey: challenge.dataset.sitekey,
+          action: challenge.dataset.action,
+          size: 'flexible',
+          retry: 'never',
+          'error-callback': showFailure,
+          'expired-callback': showFailure,
+          'timeout-callback': showFailure,
+          callback: async (token) => {
+            try {
+              const response = await fetch('/api/site-entry/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token }),
+                signal: AbortSignal.timeout(15000),
+              })
+              if (response.status !== 204) {
+                showFailure()
+                return
+              }
+              window.location.reload()
+            } catch {
+              showFailure()
+            }
+          },
+        })
+      } catch {
+        showFailure()
+      }
+    }
+
+    const script = document.createElement('script')
+    script.nonce = document.currentScript.nonce
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=renderSiteEntry&render=explicit'
+    script.onerror = showFailure
+    document.head.appendChild(script)
+  </script>
+</body>
+</html>

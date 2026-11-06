@@ -194,6 +194,13 @@ func CriticalRateLimit() func(c *gin.Context) {
 	return defNext
 }
 
+func SiteEntryRateLimit() func(c *gin.Context) {
+	if !common.CriticalRateLimitEnable {
+		return defNext
+	}
+	return rateLimitFactory(common.CriticalRateLimitNum, common.CriticalRateLimitDuration, "SE")
+}
+
 func UserCriticalRateLimit(scope string) func(c *gin.Context) {
 	if !common.CriticalRateLimitEnable {
 		return defNext
