@@ -115,3 +115,13 @@ const (
 	MsgChannelUpstreamUpdateFailedChannels  = "channel.upstream_update_failed_channels"
 	MsgChannelUpstreamUpdateMoreOmitted     = "channel.upstream_update_more_omitted"
 )
+
+// Website entry challenge.
+const (
+	MsgSiteEntryTitle       = "site_entry.title"
+	MsgSiteEntryDescription = "site_entry.description"
+	MsgSiteEntryError       = "site_entry.error"
+	MsgSiteEntryRetry       = "site_entry.retry"
+	MsgSiteEntryNoScript    = "site_entry.no_script"
+	MsgSiteEntryUnavailable = "site_entry.unavailable"
+)

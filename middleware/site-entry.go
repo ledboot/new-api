@@ -48,7 +48,7 @@ func SiteEntryChallenge(c *gin.Context) bool {
 	}
 	origin, _ := siteEntryOrigin(settings.serverAddress, c.Request.Host)
 	if origin == "" || settings.siteKey == "" || settings.secretKey == "" {
-		c.String(http.StatusServiceUnavailable, i18n.T(c, "site_entry.unavailable"))
+		c.String(http.StatusServiceUnavailable, i18n.T(c, i18n.MsgSiteEntryUnavailable))
 		return true
 	}
 	if cookie, err := c.Request.Cookie(siteEntryCookie); err == nil {
@@ -71,11 +71,11 @@ func SiteEntryChallenge(c *gin.Context) bool {
 		"Nonce":       nonce,
 		"SiteKey":     settings.siteKey,
 		"Action":      siteEntryAction,
-		"Title":       i18n.T(c, "site_entry.title"),
-		"Description": i18n.T(c, "site_entry.description"),
-		"Error":       i18n.T(c, "site_entry.error"),
-		"Retry":       i18n.T(c, "site_entry.retry"),
-		"NoScript":    i18n.T(c, "site_entry.no_script"),
+		"Title":       i18n.T(c, i18n.MsgSiteEntryTitle),
+		"Description": i18n.T(c, i18n.MsgSiteEntryDescription),
+		"Error":       i18n.T(c, i18n.MsgSiteEntryError),
+		"Retry":       i18n.T(c, i18n.MsgSiteEntryRetry),
+		"NoScript":    i18n.T(c, i18n.MsgSiteEntryNoScript),
 	}); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return true
