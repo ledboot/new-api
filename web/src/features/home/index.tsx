@@ -26,7 +26,7 @@ import { useTheme } from '@/context/theme-provider'
 import { isLikelyHtml } from '@/lib/content-format'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { CTA, Features, Hero, HowItWorks, Stats } from './components'
+import { BrandFaq, CTA, Features, Hero, HowItWorks, Stats } from './components'
 import { useHomePageContent } from './hooks'
 
 export function Home() {
@@ -109,7 +109,7 @@ export function Home() {
 
     return (
       <PublicLayout>
-        <div className='mx-auto site-container px-4 py-8'>
+        <div className='site-container mx-auto px-4 py-8'>
           <RichContent
             mode='markdown'
             content={content}
@@ -126,6 +126,7 @@ export function Home() {
       <Stats />
       <Features />
       <HowItWorks />
+      <BrandFaq />
       <CTA isAuthenticated={isAuthenticated} />
       <Footer />
     </PublicLayout>

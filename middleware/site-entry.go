@@ -40,6 +40,11 @@ func SiteEntryChallenge(c *gin.Context) bool {
 	if !settings.siteEntryEnabled() {
 		return false
 	}
+	// Search engines and AI assistants cannot solve the challenge; admitting
+	// verified crawlers is what allows the website to be indexed at all.
+	if verifiedCrawler(c) {
+		return false
+	}
 	c.Header("Cache-Control", "private, no-store")
 	if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
 		c.Header("Allow", "GET, HEAD")

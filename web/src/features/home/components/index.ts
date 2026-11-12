@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+export { BrandFaq } from './sections/brand-faq'
 export { CTA } from './sections/cta'
 export { Features } from './sections/features'
 export { Hero } from './sections/hero'

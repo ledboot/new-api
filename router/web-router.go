@@ -8,6 +8,8 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
+	"github.com/QuantumNous/new-api/pkg/siteseo"
+	"github.com/QuantumNous/new-api/setting/system_setting"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
@@ -21,6 +23,21 @@ type WebAssets struct {
 func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.HandlerFunc) {
 	frontendFS := common.EmbedFolder(assets.BuildFS, "web/dist")
 	compress := gzip.Gzip(gzip.DefaultCompression)
+
+	// Crawler-facing documents are answered directly: they must stay reachable
+	// without the visitor challenge and without executing the frontend.
+	router.GET("/robots.txt", func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=3600")
+		c.String(http.StatusOK, siteseo.RobotsTxt(siteOrigin(c)))
+	})
+	router.GET("/sitemap.xml", func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=3600")
+		c.String(http.StatusOK, siteseo.Sitemap(siteOrigin(c), nil))
+	})
+	router.GET("/llms.txt", func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=3600")
+		c.String(http.StatusOK, siteseo.LLMsTxt(siteOrigin(c)))
+	})
 
 	router.NoRoute(
 		pluginDispatcher,
@@ -36,6 +53,10 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 		middleware.Cache(),
 		middleware.ServeFrontendFiles(frontendFS),
 		func(c *gin.Context) {
+			if target, ok := siteseo.CanonicalRedirect(system_setting.ServerAddress, c.Request.Host, c.Request.URL.RequestURI()); ok && (c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead) {
+				c.Redirect(http.StatusMovedPermanently, target)
+				return
+			}
 			if strings.HasPrefix(c.Request.RequestURI, "/v1") || strings.HasPrefix(c.Request.RequestURI, "/api") || strings.HasPrefix(c.Request.RequestURI, "/assets") {
 				controller.RelayNotFound(c)
 				return
@@ -44,7 +65,16 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 			if middleware.SiteEntryChallenge(c) {
 				return
 			}
-			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.IndexPage)
+			// The metadata language follows Accept-Language, so caches must not
+			// reuse one language variant for another.
+			c.Header("Vary", "Accept-Language")
+			document := siteseo.Document(assets.IndexPage, c.Request.URL.Path, siteOrigin(c), c.GetHeader("Accept-Language"))
+			c.Data(http.StatusOK, "text/html; charset=utf-8", document)
 		},
 	)
+}
+
+// siteOrigin is the public origin used for canonical links and sitemap entries.
+func siteOrigin(c *gin.Context) string {
+	return siteseo.Origin(system_setting.ServerAddress, c.Request.Host)
 }

@@ -23,9 +23,11 @@ import {
   Outlet,
   redirect,
   useNavigate,
+  useRouterState,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { NavigationProgress } from '@/components/navigation-progress'
 import { Toaster } from '@/components/ui/sonner'
@@ -34,6 +36,7 @@ import { saveAffiliateCode } from '@/features/auth/lib/storage'
 import { GeneralError } from '@/features/errors/general-error'
 import { NotFoundError } from '@/features/errors/not-found-error'
 import { getSetupStatus } from '@/features/setup/api'
+import { usePageSeo } from '@/hooks/use-page-seo'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import {
   bootstrapAuthentication,
@@ -47,9 +50,14 @@ import { useAuthStore } from '@/stores/auth-store'
 function RootComponent() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { i18n } = useTranslation()
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
 
   // Load system configuration (logo, system name, etc.) from backend
   useSystemConfig({ autoLoad: true })
+  usePageSeo(pathname, i18n.language)
 
   useEffect(() => {
     const aff = new URLSearchParams(window.location.search).get('aff')?.trim()

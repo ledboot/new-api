@@ -71,20 +71,13 @@ const rootElement = document.querySelector<HTMLElement>('#root')
 if (!rootElement) {
   throw new Error('Root element not found')
 }
-// Set document.title and favicon from cached status, then refresh from network
+// Apply the favicon from cached status, then refresh from network. The document
+// title belongs to the page metadata (see usePageSeo) and is not set here.
 ;(function initSystemBranding() {
   try {
     if (typeof window === 'undefined' || typeof document === 'undefined') return
-    const apply = (name: string) => {
-      document.title = name
-      const metaTitle = document.querySelector(
-        'meta[name="title"]'
-      ) as HTMLMetaElement | null
-      if (metaTitle) metaTitle.setAttribute('content', name)
-    }
     // Cache-first
     const cached = mapStatusDataToConfig(readCachedStatus())
-    if (cached.systemName) apply(cached.systemName)
     if (cached.logo) applyFaviconToDom(cached.logo)
 
     // Background refresh through the shared cache. This primes ['status']
@@ -95,7 +88,6 @@ if (!rootElement) {
       .ensureQueryData(statusQueryOptions)
       .then((status) => {
         const config = mapStatusDataToConfig(status)
-        if (config.systemName) apply(config.systemName)
         if (config.logo) applyFaviconToDom(config.logo)
       })
       .catch(() => {
