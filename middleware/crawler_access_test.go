@@ -41,11 +41,15 @@ func TestCrawlerClientIPOnlyTrustsCloudflareHeaderFromEdge(t *testing.T) {
 	// Direct connection: the header is client-controlled and must be ignored.
 	assert.Equal(t, "203.0.113.9", crawlerClientIP(requestWith("203.0.113.9:1234", "", "66.249.66.1")))
 
-	// Cloudflare edge (trusted proxy): the real client comes from the edge.
-	assert.Equal(t, "66.249.66.1", crawlerClientIP(requestWith("172.64.0.5:443", "66.249.66.1", "66.249.66.1")))
+	// A direct request that claims to come through Cloudflare: the proxy still
+	// appended the real peer last, so the claim has no effect.
+	assert.Equal(t, "203.0.113.9", crawlerClientIP(requestWith("172.18.0.12:40000", "172.64.0.5, 203.0.113.9", "66.249.66.1")))
+
+	// Cloudflare edge: the real client comes from the header the edge wrote.
+	assert.Equal(t, "66.249.66.1", crawlerClientIP(requestWith("172.18.0.12:40000", "66.249.66.1, 172.64.0.5", "66.249.66.1")))
 
 	// Cloudflare edge without a usable header: nothing to verify.
-	assert.Equal(t, "", crawlerClientIP(requestWith("172.64.0.5:443", "", "not-an-ip")))
+	assert.Equal(t, "", crawlerClientIP(requestWith("172.18.0.12:40000", "203.0.113.9, 172.64.0.5", "not-an-ip")))
 }
 
 func TestConfirmCrawlerHostRequiresForwardConfirmedReverseDNS(t *testing.T) {

@@ -150,20 +150,41 @@ func crawlerHostSuffixes(userAgent string) []string {
 // crawlerClientIP returns the address to verify. Behind Cloudflare the
 // connection ends at an edge node, so the real client comes from the
 // CF-Connecting-IP header that Cloudflare writes itself.
+//
+// The proxy in front of this service appends the address it accepted the
+// connection from as the last X-Forwarded-For entry, so that entry - and only
+// that entry - is the trustworthy peer. Earlier entries are client-supplied,
+// and reading the header from a request that reached the origin directly would
+// let anyone claim a crawler address.
 func crawlerClientIP(c *gin.Context) string {
-	clientIP := c.ClientIP()
-	if net.ParseIP(clientIP) == nil {
+	peer := connectionPeerIP(c)
+	parsedPeer := net.ParseIP(peer)
+	if parsedPeer == nil {
 		return ""
 	}
-	edgeIP := net.ParseIP(clientIP)
-	if edgeIP == nil || !inAnyNetwork(edgeIP, cloudflareEdgeNets) {
-		return clientIP
+	if !inAnyNetwork(parsedPeer, cloudflareEdgeNets) {
+		return peer
 	}
 	forwarded := strings.TrimSpace(c.GetHeader("CF-Connecting-IP"))
 	if net.ParseIP(forwarded) == nil {
 		return ""
 	}
 	return forwarded
+}
+
+// connectionPeerIP is the address the reverse proxy received the request from.
+func connectionPeerIP(c *gin.Context) string {
+	if values := c.Request.Header.Values("X-Forwarded-For"); len(values) > 0 {
+		hops := strings.Split(strings.Join(values, ","), ",")
+		if peer := strings.TrimSpace(hops[len(hops)-1]); peer != "" {
+			return peer
+		}
+	}
+	host, _, err := net.SplitHostPort(strings.TrimSpace(c.Request.RemoteAddr))
+	if err != nil {
+		return strings.TrimSpace(c.Request.RemoteAddr)
+	}
+	return host
 }
 
 func inAnyNetwork(ip net.IP, networks []*net.IPNet) bool {
