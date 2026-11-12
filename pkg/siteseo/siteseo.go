@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 
@@ -253,6 +254,8 @@ func Document(indexPage []byte, requestPath, origin, acceptLanguage string) []by
 	writeMeta(&head, "name", "twitter:title", text.title)
 	writeMeta(&head, "name", "twitter:description", text.description)
 	writeMeta(&head, "name", "twitter:image", base+"/tokara-logo.webp")
+	// Search Console HTML-tag verification, when the operator sets it.
+	writeMeta(&head, "name", "google-site-verification", os.Getenv("GOOGLE_SITE_VERIFICATION"))
 	if indexable {
 		head.WriteString(structuredData(base, documentPath, lang, meta.breadcrumb))
 	}

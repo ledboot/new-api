@@ -36,6 +36,12 @@ func TestDocumentRendersPageMetadata(t *testing.T) {
 	assert.NotContains(t, english, `"@type":"SoftwareApplication"`)
 }
 
+func TestDocumentIncludesSearchConsoleVerification(t *testing.T) {
+	t.Setenv("GOOGLE_SITE_VERIFICATION", "verification-token")
+	page := string(Document([]byte(testIndexPage), "/", "https://tokara.top", "en"))
+	assert.Contains(t, page, `<meta name="google-site-verification" content="verification-token" />`)
+}
+
 func TestDocumentMarksUnknownPathsNoIndex(t *testing.T) {
 	unknown := string(Document([]byte(testIndexPage), "/console/dashboard", "https://tokara.top", "en"))
 	assert.Contains(t, unknown, `content="noindex, follow"`)

@@ -26,15 +26,16 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 
 	// Crawler-facing documents are answered directly: they must stay reachable
 	// without the visitor challenge and without executing the frontend.
-	router.GET("/robots.txt", func(c *gin.Context) {
+	crawlerDocument := []string{http.MethodGet, http.MethodHead}
+	router.Match(crawlerDocument, "/robots.txt", func(c *gin.Context) {
 		c.Header("Cache-Control", "public, max-age=3600")
 		c.String(http.StatusOK, siteseo.RobotsTxt(siteOrigin(c)))
 	})
-	router.GET("/sitemap.xml", func(c *gin.Context) {
+	router.Match(crawlerDocument, "/sitemap.xml", func(c *gin.Context) {
 		c.Header("Cache-Control", "public, max-age=3600")
 		c.String(http.StatusOK, siteseo.Sitemap(siteOrigin(c), nil))
 	})
-	router.GET("/llms.txt", func(c *gin.Context) {
+	router.Match(crawlerDocument, "/llms.txt", func(c *gin.Context) {
 		c.Header("Cache-Control", "public, max-age=3600")
 		c.String(http.StatusOK, siteseo.LLMsTxt(siteOrigin(c)))
 	})
