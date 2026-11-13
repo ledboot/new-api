@@ -153,8 +153,11 @@ func metadataFor(documentPath, lang string) (pageMeta, bool) {
 	if meta, ok := staticPages[documentPath]; ok {
 		return meta, true
 	}
-	modelID, ok := strings.CutPrefix(documentPath, "/pricing/")
-	if ok && modelID != "" && !strings.Contains(modelID, "/") && len(modelID) <= 120 {
+	escapedModelID, ok := strings.CutPrefix(documentPath, "/pricing/")
+	// The model identifier is one path segment, so a vendor-prefixed name such
+	// as openai/gpt-4o arrives percent-encoded.
+	modelID, err := url.PathUnescape(escapedModelID)
+	if ok && err == nil && modelID != "" && !strings.Contains(escapedModelID, "/") && len(modelID) <= 120 && isPrintableModelName(modelID) {
 		if lang == langEn {
 			return pageMeta{
 				en: copywriting{
@@ -173,6 +176,17 @@ func metadataFor(documentPath, lang string) (pageMeta, bool) {
 		}, true
 	}
 	return pageMeta{}, false
+}
+
+// isPrintableModelName rejects control characters, which would end up in the
+// document title.
+func isPrintableModelName(name string) bool {
+	for _, char := range name {
+		if char < 0x20 || char == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 type jsonLD struct {

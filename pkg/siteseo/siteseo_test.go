@@ -61,6 +61,16 @@ func TestDocumentEscapesModelIdentifier(t *testing.T) {
 	assert.Contains(t, model, "pricing and billing")
 }
 
+func TestDocumentIndexesModelPagesByIdentifier(t *testing.T) {
+	vendorPrefixed := string(Document([]byte(testIndexPage), "/pricing/openai%2Fgpt-4o", "https://tokara.top", "en"))
+	assert.Contains(t, vendorPrefixed, "<title>openai/gpt-4o pricing and billing — Tokara</title>")
+	assert.Contains(t, vendorPrefixed, `<link rel="canonical" href="https://tokara.top/pricing/openai%2Fgpt-4o" />`)
+	assert.Contains(t, vendorPrefixed, `content="index, follow`)
+
+	spaced := string(Document([]byte(testIndexPage), "/pricing/gpt%204o", "https://tokara.top", "zh-CN"))
+	assert.Contains(t, spaced, "<title>gpt 4o 模型价格与计费 — Tokara</title>")
+}
+
 func TestFeeds(t *testing.T) {
 	robots := RobotsTxt("https://tokara.top")
 	assert.Contains(t, robots, "Sitemap: https://tokara.top/sitemap.xml")

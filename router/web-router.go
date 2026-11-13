@@ -3,11 +3,13 @@ package router
 import (
 	"embed"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/siteseo"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 	"github.com/gin-contrib/gzip"
@@ -33,7 +35,7 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 	})
 	router.Match(crawlerDocument, "/sitemap.xml", func(c *gin.Context) {
 		c.Header("Cache-Control", "public, max-age=3600")
-		c.String(http.StatusOK, siteseo.Sitemap(siteOrigin(c), nil))
+		c.String(http.StatusOK, siteseo.Sitemap(siteOrigin(c), modelPricingPaths()))
 	})
 	router.Match(crawlerDocument, "/llms.txt", func(c *gin.Context) {
 		c.Header("Cache-Control", "public, max-age=3600")
@@ -69,10 +71,29 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 			// The metadata language follows Accept-Language, so caches must not
 			// reuse one language variant for another.
 			c.Header("Vary", "Accept-Language")
-			document := siteseo.Document(assets.IndexPage, c.Request.URL.Path, siteOrigin(c), c.GetHeader("Accept-Language"))
+			document := siteseo.Document(assets.IndexPage, c.Request.URL.EscapedPath(), siteOrigin(c), c.GetHeader("Accept-Language"))
 			c.Data(http.StatusOK, "text/html; charset=utf-8", document)
 		},
 	)
+}
+
+// modelPricingPaths lists the public model pages so search engines discover the
+// long-tail price pages without waiting for an internal link crawl.
+func modelPricingPaths() []string {
+	const maxModelPaths = 2000
+	pricing := model.GetPricing()
+	paths := make([]string, 0, min(len(pricing), maxModelPaths))
+	for _, entry := range pricing {
+		name := strings.TrimSpace(entry.ModelName)
+		if name == "" {
+			continue
+		}
+		paths = append(paths, "/pricing/"+url.PathEscape(name))
+		if len(paths) >= maxModelPaths {
+			break
+		}
+	}
+	return paths
 }
 
 // siteOrigin is the public origin used for canonical links and sitemap entries.
