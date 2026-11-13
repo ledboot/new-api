@@ -91,7 +91,10 @@ import {
   replaceModelInPath,
   isTokenBasedModel,
 } from '../lib/model-helpers'
-import { withPluginPricing } from '../lib/plugin-pricing'
+import {
+  withOrdinaryPricing,
+  withPluginPricing,
+} from '../lib/plugin-pricing'
 import {
   calculateTokenPrice,
   formatDeltaPercent,
@@ -844,6 +847,8 @@ function sortPricingGroupsByInputPrice(
   })
   return prices.map((item) => item.group)
 }
+// Plugin keys cannot start with an underscore, so this tab value is free.
+const ORDINARY_PRICING_TAB = '__model__'
 
 function GroupPricingSection(props: GroupPricingSectionProps) {
   const { t } = useTranslation()
@@ -851,6 +856,7 @@ function GroupPricingSection(props: GroupPricingSectionProps) {
   if (!variants?.length) {
     return <ProviderGroupPricingSection {...props} />
   }
+  const ordinary = props.model.ordinary_pricing
   return (
     <section>
       <GroupPricingHeading
@@ -860,11 +866,19 @@ function GroupPricingSection(props: GroupPricingSectionProps) {
           !isTokenBasedModel(props.model)
         }
       />
-      <Tabs key={props.model.model_name} defaultValue={variants[0].plugin_key}>
+      <Tabs
+        key={props.model.model_name}
+        defaultValue={ordinary ? ORDINARY_PRICING_TAB : variants[0].plugin_key}
+      >
         <TabsList
           aria-label={t('Provider')}
           className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'
         >
+          {ordinary && (
+            <TabsTrigger value={ORDINARY_PRICING_TAB}>
+              {t('Default price')}
+            </TabsTrigger>
+          )}
           {variants.map((variant) => (
             <TabsTrigger
               key={variant.plugin_key}
@@ -885,6 +899,15 @@ function GroupPricingSection(props: GroupPricingSectionProps) {
             </TabsTrigger>
           ))}
         </TabsList>
+        {ordinary && (
+          <TabsContent value={ORDINARY_PRICING_TAB}>
+            <ProviderGroupPricingSection
+              {...props}
+              model={withOrdinaryPricing(props.model)}
+              hideTitle
+            />
+          </TabsContent>
+        )}
         {variants.map((variant) => (
           <TabsContent key={variant.plugin_key} value={variant.plugin_key}>
             {variant.billing_expr || variant.billing_mode === 'ratio' ? (

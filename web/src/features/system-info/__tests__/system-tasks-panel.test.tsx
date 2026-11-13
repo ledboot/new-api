@@ -284,38 +284,40 @@ it('refreshes history when the last running task finishes', async () => {
 })
 
 it('opens the OpenLux source changes from task history without applying prices', async () => {
-  vi.spyOn(api, 'get').mockImplementation(async (_url, config) => ({
-    data: {
-      success: true,
-      data:
-        config?.params?.scope === 'active'
-          ? []
-          : [
-              {
-                ...task,
-                type: 'openlux_sync',
-                result: {
-                  baseline: false,
-                  changed: true,
-                  models: {
-                    added: 1,
-                    removed: 0,
-                    updated: 1,
-                    names: ['new-model', 'updated-model'],
+  vi.spyOn(api, 'get').mockImplementation(
+    async (_url, config?: ApiRequestConfig) => ({
+      data: {
+        success: true,
+        data:
+          config?.params?.scope === 'active'
+            ? []
+            : [
+                {
+                  ...task,
+                  type: 'openlux_sync',
+                  result: {
+                    baseline: false,
+                    changed: true,
+                    models: {
+                      added: 1,
+                      removed: 0,
+                      updated: 1,
+                      names: ['new-model', 'updated-model'],
+                    },
+                    groups: {
+                      added: 0,
+                      removed: 1,
+                      updated: 0,
+                      names: ['retired-group'],
+                    },
+                    vendors: { added: 0, removed: 0, updated: 0 },
                   },
-                  groups: {
-                    added: 0,
-                    removed: 1,
-                    updated: 0,
-                    names: ['retired-group'],
-                  },
-                  vendors: { added: 0, removed: 0, updated: 0 },
                 },
-              },
-            ],
-      total: 1,
-    },
-  }))
+              ],
+        total: 1,
+      },
+    })
+  )
   const post = vi.spyOn(api, 'post')
   const patch = vi.spyOn(api, 'patch')
   const client = renderPanel()
