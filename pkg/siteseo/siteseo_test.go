@@ -71,6 +71,29 @@ func TestDocumentIndexesModelPagesByIdentifier(t *testing.T) {
 	assert.Contains(t, spaced, "<title>gpt 4o 模型价格与计费 — Tokara</title>")
 }
 
+func TestBreadcrumbListsEachStepOnce(t *testing.T) {
+	jsonLDOf := func(page string) string {
+		start := strings.Index(page, `"@type":"BreadcrumbList"`)
+		require.GreaterOrEqual(t, start, 0)
+		end := strings.Index(page[start:], "</script>")
+		require.GreaterOrEqual(t, end, 0)
+		return page[start : start+end]
+	}
+
+	pricing := jsonLDOf(string(Document([]byte(testIndexPage), "/pricing", "https://tokara.top", "en")))
+	assert.Equal(t, 1, strings.Count(pricing, `"name":"Pricing"`))
+
+	model := jsonLDOf(string(Document([]byte(testIndexPage), "/pricing/gpt-4o", "https://tokara.top", "en")))
+	assert.Equal(t, 1, strings.Count(model, `"name":"Pricing"`))
+	assert.Equal(t, 1, strings.Count(model, `"name":"gpt-4o"`))
+	assert.Contains(t, model, `"position":3`)
+	assert.NotContains(t, model, `"position":4`)
+
+	docs := jsonLDOf(string(Document([]byte(testIndexPage), "/docs", "https://tokara.top", "en")))
+	assert.Contains(t, docs, `"name":"Docs"`)
+	assert.Contains(t, docs, `"position":2`)
+}
+
 func TestFeeds(t *testing.T) {
 	robots := RobotsTxt("https://tokara.top")
 	assert.Contains(t, robots, "Sitemap: https://tokara.top/sitemap.xml")

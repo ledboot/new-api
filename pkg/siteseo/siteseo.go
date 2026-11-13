@@ -21,9 +21,15 @@ type copywriting struct {
 }
 
 type pageMeta struct {
-	zh         copywriting
-	en         copywriting
-	breadcrumb string
+	zh    copywriting
+	en    copywriting
+	trail []crumb
+}
+
+// crumb is one step of the breadcrumb trail below the home page.
+type crumb struct {
+	name string
+	path string
 }
 
 const (
@@ -41,7 +47,7 @@ var staticPages = map[string]pageMeta{
 			title:       "Tokara — One AI API for OpenAI, Claude, Gemini and DeepSeek",
 			description: "Tokara is an AI API platform for developers and creators: call OpenAI, Claude, Gemini and DeepSeek models with a single key over an OpenAI-compatible API, with pay-as-you-go billing and real-time usage analytics.",
 		},
-		breadcrumb: "",
+		trail: nil,
 	},
 	"/pricing": {
 		zh: copywriting{
@@ -52,7 +58,7 @@ var staticPages = map[string]pageMeta{
 			title:       "Tokara Pricing — Pay-as-you-go AI API model prices",
 			description: "Compare Tokara model prices and billing rules: per-token pricing for input and output, group rate multipliers and side-by-side model comparison for accurate cost estimates.",
 		},
-		breadcrumb: "Pricing",
+		trail: []crumb{{name: "Pricing", path: "/pricing"}},
 	},
 	"/docs": {
 		zh: copywriting{
@@ -63,7 +69,7 @@ var staticPages = map[string]pageMeta{
 			title:       "Tokara Docs — AI API setup and usage guide",
 			description: "Tokara documentation: create API keys, point OpenAI-compatible clients at Tokara, browse models and usage, and troubleshoot common issues.",
 		},
-		breadcrumb: "Docs",
+		trail: []crumb{{name: "Docs", path: "/docs"}},
 	},
 	"/about": {
 		zh: copywriting{
@@ -74,7 +80,7 @@ var staticPages = map[string]pageMeta{
 			title:       "About Tokara — the AI model API platform",
 			description: "Learn about Tokara: an AI model API platform for developers and creators that unifies OpenAI, Claude, Gemini and other leading models behind one endpoint with transparent billing.",
 		},
-		breadcrumb: "About",
+		trail: []crumb{{name: "About", path: "/about"}},
 	},
 	"/rankings": {
 		zh: copywriting{
@@ -85,17 +91,17 @@ var staticPages = map[string]pageMeta{
 			title:       "Tokara Rankings — AI model performance and value leaderboard",
 			description: "See how AI models on Tokara compare by usage, speed and price, and pick the right model for each workload.",
 		},
-		breadcrumb: "Rankings",
+		trail: []crumb{{name: "Rankings", path: "/rankings"}},
 	},
 	"/privacy-policy": {
-		zh:         copywriting{title: "Tokara 隐私政策", description: "Tokara 如何收集、使用与保护你的个人信息。"},
-		en:         copywriting{title: "Tokara Privacy Policy", description: "How Tokara collects, uses and protects your personal information."},
-		breadcrumb: "Privacy Policy",
+		zh:    copywriting{title: "Tokara 隐私政策", description: "Tokara 如何收集、使用与保护你的个人信息。"},
+		en:    copywriting{title: "Tokara Privacy Policy", description: "How Tokara collects, uses and protects your personal information."},
+		trail: []crumb{{name: "Privacy Policy", path: "/privacy-policy"}},
 	},
 	"/user-agreement": {
-		zh:         copywriting{title: "Tokara 用户协议", description: "使用 Tokara 服务时适用的条款与条件。"},
-		en:         copywriting{title: "Tokara Terms of Service", description: "The terms and conditions that apply when you use Tokara services."},
-		breadcrumb: "Terms of Service",
+		zh:    copywriting{title: "Tokara 用户协议", description: "使用 Tokara 服务时适用的条款与条件。"},
+		en:    copywriting{title: "Tokara Terms of Service", description: "The terms and conditions that apply when you use Tokara services."},
+		trail: []crumb{{name: "Terms of Service", path: "/user-agreement"}},
 	},
 }
 
@@ -164,7 +170,10 @@ func metadataFor(documentPath, lang string) (pageMeta, bool) {
 					title:       fmt.Sprintf("%s pricing and billing — Tokara", modelID),
 					description: fmt.Sprintf("Tokara price sheet for the %s model: input and output token prices, billing rules and how to call it through an OpenAI-compatible API.", modelID),
 				},
-				breadcrumb: "Pricing",
+				trail: []crumb{
+					{name: "Pricing", path: "/pricing"},
+					{name: modelID, path: documentPath},
+				},
 			}, true
 		}
 		return pageMeta{
@@ -172,7 +181,10 @@ func metadataFor(documentPath, lang string) (pageMeta, bool) {
 				title:       fmt.Sprintf("%s 模型价格与计费 — Tokara", modelID),
 				description: fmt.Sprintf("Tokara 上 %s 模型的输入与输出 token 价格、计费规则，以及如何通过 OpenAI 兼容接口调用。", modelID),
 			},
-			breadcrumb: "Pricing",
+			trail: []crumb{
+				{name: "Pricing", path: "/pricing"},
+				{name: modelID, path: documentPath},
+			},
 		}, true
 	}
 	return pageMeta{}, false
@@ -271,7 +283,7 @@ func Document(indexPage []byte, requestPath, origin, acceptLanguage string) []by
 	// Search Console HTML-tag verification, when the operator sets it.
 	writeMeta(&head, "name", "google-site-verification", os.Getenv("GOOGLE_SITE_VERIFICATION"))
 	if indexable {
-		head.WriteString(structuredData(base, documentPath, lang, meta.breadcrumb))
+		head.WriteString(structuredData(base, documentPath, lang, meta.trail))
 	}
 	// The document title of a single-page app must change on client-side
 	// navigation. Shipping the copy once, in the page, keeps the browser tab and
@@ -284,7 +296,7 @@ func Document(indexPage []byte, requestPath, origin, acceptLanguage string) []by
 	return []byte(document)
 }
 
-func structuredData(base, documentPath, lang, breadcrumb string) string {
+func structuredData(base, documentPath, lang string, trail []crumb) string {
 	organizationID := base + "/#organization"
 	graph := []any{
 		jsonLD{
@@ -304,14 +316,15 @@ func structuredData(base, documentPath, lang, breadcrumb string) string {
 			Name: common.SystemName, URL: base, Description: organizationDescription(lang),
 		})
 	}
-	if breadcrumb != "" {
+	if len(trail) > 0 {
 		items := []listItem{
 			{Type: "ListItem", Position: 1, Name: common.SystemName, Item: base + "/"},
 		}
-		if documentPath == "/pricing" || strings.HasPrefix(documentPath, "/pricing/") {
-			items = append(items, listItem{Type: "ListItem", Position: 2, Name: "Pricing", Item: base + "/pricing"})
+		for _, step := range trail {
+			items = append(items, listItem{
+				Type: "ListItem", Position: len(items) + 1, Name: step.name, Item: base + step.path,
+			})
 		}
-		items = append(items, listItem{Type: "ListItem", Position: len(items) + 1, Name: breadcrumb})
 		graph = append(graph, jsonLD{
 			Context: "https://schema.org", Type: "BreadcrumbList", ItemListElement: items,
 		})
