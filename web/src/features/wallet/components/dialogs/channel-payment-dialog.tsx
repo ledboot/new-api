@@ -55,6 +55,7 @@ export function ChannelPaymentDialog(props: {
     const timer = setInterval(() => setNow(Date.now()), COUNTDOWN_TICK_MS)
     return () => clearInterval(timer)
   }, [expiresAt, expired])
+  const cryptoAmount = props.checkout.crypto_amount
   // epay-family gateways (CNY) confirm a payment only when its amount matches
   // the order exactly. Only the 502 gateway sends a deadline for CNY orders, so
   // the five-minute copy appears only when a deadline is present.
@@ -90,9 +91,42 @@ export function ChannelPaymentDialog(props: {
       }
     >
       <div className='flex flex-col items-center gap-4'>
-        <p className='text-xl font-semibold'>
-          {props.checkout.amount} {props.checkout.currency}
-        </p>
+        {cryptoAmount ? (
+          <div className='flex w-full flex-col items-center gap-2 text-center'>
+            <p>{t('Exact transfer amount')}</p>
+            <p className='text-3xl font-semibold tabular-nums'>
+              {cryptoAmount}
+            </p>
+            {!expired && (
+              <CopyButton
+                value={cryptoAmount}
+                variant='outline'
+                size='sm'
+                aria-label={t('Copy transfer amount')}
+              >
+                {t('Copy transfer amount')}
+              </CopyButton>
+            )}
+            {props.checkout.network && (
+              <>
+                <p className='font-medium'>
+                  {t('Network')}: {props.checkout.network}
+                </p>
+                {!expired && (
+                  <p className='text-muted-foreground text-sm'>
+                    {t(
+                      'Use the selected network and transfer the exact amount before the order expires.'
+                    )}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <p className='text-xl font-semibold'>
+            {props.checkout.amount} {props.checkout.currency}
+          </p>
+        )}
         {requiresExactAmount && (
           <Alert className='w-full'>
             <AlertDescription className='text-center'>
@@ -124,16 +158,6 @@ export function ChannelPaymentDialog(props: {
             </p>
           </div>
         )}
-        {props.checkout.network && (
-          <p className='text-center font-medium'>
-            {t('Network')}: {props.checkout.network}
-          </p>
-        )}
-        {props.checkout.crypto_amount && (
-          <p className='text-center font-semibold'>
-            {t('Exact transfer amount')}: {props.checkout.crypto_amount}
-          </p>
-        )}
         {!expired && (
           <div className='max-w-full rounded-lg bg-white p-4'>
             <QRCodeSVG
@@ -149,16 +173,10 @@ export function ChannelPaymentDialog(props: {
             value={props.checkout.qr_code ?? ''}
             variant='outline'
             size='sm'
+            aria-label={t('Copy payment code')}
           >
             {t('Copy payment code')}
           </CopyButton>
-        )}
-        {props.checkout.network && (
-          <p className='text-muted-foreground text-center text-sm'>
-            {t(
-              'Use the selected network and transfer the exact amount before the order expires.'
-            )}
-          </p>
         )}
         {expired && (
           <p role='status'>

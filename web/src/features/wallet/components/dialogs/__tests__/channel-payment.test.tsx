@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { api } from '@/lib/api'
@@ -31,9 +31,15 @@ vi.mock('react-i18next', () => ({
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
-test('a native crypto QR shows the network and exact amount while waiting for verified payment', async () => {
+test('a crypto QR shows and copies the exact transfer amount while waiting for verified payment', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  vi.stubGlobal(
+    'navigator',
+    Object.create(navigator, { clipboard: { value: { writeText } } })
+  )
   vi.mocked(api.get).mockResolvedValue({
     data: { success: true, data: { status: 'pending' } },
   })
@@ -59,7 +65,10 @@ test('a native crypto QR shows the network and exact amount while waiting for ve
     </QueryClientProvider>
   )
   expect(screen.getByText('Network: usdt.bep20')).toBeVisible()
-  expect(screen.getByText('Exact transfer amount: 10.123')).toBeVisible()
+  expect(screen.getByText('10.123')).toBeVisible()
+  expect(screen.queryByText('10.00 USD')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Copy transfer amount' }))
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith('10.123'))
   expect(screen.getByTitle('Payment QR code')).toBeInTheDocument()
   await waitFor(() => expect(api.get).toHaveBeenCalled())
   expect(paid).not.toHaveBeenCalled()
@@ -78,6 +87,7 @@ test('an expired crypto quote hides the payment QR to prevent transfers using a 
         checkout={{
           kind: 'qr',
           order_id: 'PC-expired',
+          crypto_amount: '10.123',
           amount: '10.00',
           currency: 'USD',
           qr_code: '0xwallet',
@@ -89,6 +99,9 @@ test('an expired crypto quote hides the payment QR to prevent transfers using a 
     </QueryClientProvider>
   )
   expect(screen.queryByTitle('Payment QR code')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: 'Copy transfer amount' })
+  ).not.toBeInTheDocument()
   expect(
     screen.queryByRole('button', { name: 'Copy payment code' })
   ).not.toBeInTheDocument()
