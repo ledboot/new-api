@@ -124,7 +124,10 @@ func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 			}
 		}
 		countClaudeStreamBillableTools(info, &claudeResponse)
-		helper.ClaudeChunkData(c, claudeResponse, data)
+		writeErr := helper.ClaudeChunkData(c, claudeResponse, data)
+		if claudeResponse.Type == "message_stop" {
+			info.StreamStatus.RecordDownstreamCompletion(writeErr)
+		}
 	} else if info.RelayFormat == types.RelayFormatOpenAI {
 		state, err := claudeToChatStreamState(info)
 		if err != nil {
@@ -313,7 +316,7 @@ func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, clau
 				common.SysLog(common.LogText("send final response failed: %s", err.Error()))
 			}
 		}
-		helper.Done(c)
+		_ = helper.WriteStreamCompletionData(c, info.StreamStatus, "[DONE]")
 	} else if info.RelayFormat == types.RelayFormatGemini {
 		state, err := claudeToGeminiStreamState(info)
 		if err != nil {

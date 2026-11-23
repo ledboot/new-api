@@ -100,6 +100,9 @@ func OaiChatToResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 			streamErr = types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
 			return false
 		}
+		if event.Type == "response.completed" {
+			info.StreamStatus.RecordDownstreamCompletion(nil)
+		}
 		return true
 	}
 	failResponsesStream := func(err error) bool {

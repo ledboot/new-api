@@ -2,6 +2,7 @@ package claude
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -22,6 +23,54 @@ import (
 
 func commonPointer[T any](value T) *T {
 	return &value
+}
+
+type claudeCompletionWriter struct {
+	*httptest.ResponseRecorder
+}
+
+func (w claudeCompletionWriter) Write(data []byte) (int, error) {
+	if strings.Contains(string(data), "event: message_stop") {
+		return 0, io.ErrClosedPipe
+	}
+	return w.ResponseRecorder.Write(data)
+}
+
+func TestClaudeStreamRecordsUpstreamCompletionSeparatelyFromDelivery(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		event     string
+		failWrite bool
+		upstream  bool
+		written   bool
+	}{
+		{name: "completion delivered", event: `{"type":"message_stop"}`, upstream: true, written: true},
+		{name: "completion write fails", event: `{"type":"message_stop"}`, failWrite: true, upstream: true},
+		{name: "no terminal event", event: `{"type":"ping"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			var writer http.ResponseWriter = recorder
+			if tc.failWrite {
+				writer = claudeCompletionWriter{recorder}
+			}
+			c, _ := gin.CreateTestContext(writer)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+			info := &relaycommon.RelayInfo{
+				RelayFormat: types.RelayFormatClaude, StreamStatus: relaycommon.NewStreamStatus(),
+			}
+			state := &ClaudeResponseInfo{Usage: &dto.Usage{}}
+
+			require.Nil(t, HandleStreamResponseData(c, info, state, tc.event))
+			upstream, written := info.StreamStatus.CompletionEvents()
+			assert.Equal(t, tc.upstream, upstream)
+			assert.Equal(t, tc.written, written)
+			if tc.written {
+				assert.Contains(t, recorder.Body.String(), "event: message_stop\ndata: "+tc.event)
+				assert.True(t, recorder.Flushed)
+			}
+		})
+	}
 }
 
 func TestClaudeStreamFinalUsageEstimatesOnlyUncountedUsage(t *testing.T) {

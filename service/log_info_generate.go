@@ -176,9 +176,12 @@ func appendStreamStatus(relayInfo *relaycommon.RelayInfo, other *model.LogOther)
 	if !ss.IsNormalEnd() || ss.HasErrors() || ss.ResponseFailed() {
 		status = "error"
 	}
+	upstreamCompletion, downstreamCompletion := ss.CompletionEvents()
 	streamInfo := map[string]any{
-		"status":     status,
-		"end_reason": string(ss.EndReason),
+		"upstream_completion_observed":  upstreamCompletion,
+		"downstream_completion_written": downstreamCompletion,
+		"status":                        status,
+		"end_reason":                    string(ss.EndReason),
 	}
 	if outcome := ss.ResponseOutcome(); outcome != "" {
 		streamInfo["response_status"] = outcome

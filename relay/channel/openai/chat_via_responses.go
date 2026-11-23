@@ -383,7 +383,7 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 	}
 
 	if info.RelayFormat == types.RelayFormatOpenAI {
-		helper.Done(c)
+		_ = helper.WriteStreamCompletionData(c, info.StreamStatus, "[DONE]")
 	}
 	return usage, nil
 }

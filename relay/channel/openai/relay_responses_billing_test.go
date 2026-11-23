@@ -194,6 +194,11 @@ func TestOaiResponsesStreamHandlerCompletionLifecycle(t *testing.T) {
 			assert.Equal(t, tc.responseStatus, info.StreamStatus.ResponseOutcome())
 			log := service.GenerateTextOtherInfo(c, info, 1, 1, 1, 0, 1, 0, 1).Snapshot()["stream_status"].(map[string]any)
 			assert.Equal(t, tc.wantError, log["status"] == "error")
+			completionObserved := tc.responseStatus == "completed"
+			assert.Equal(t, completionObserved, log["upstream_completion_observed"])
+			assert.Equal(t, completionObserved && !tc.cancelBeforeFlush && tc.failWrite == 0 && !tc.failFlush,
+				log["downstream_completion_written"])
+
 			if tc.responseStatus != "" {
 				assert.Equal(t, 7, usage.PromptTokens)
 				assert.Equal(t, 5, usage.CompletionTokens)

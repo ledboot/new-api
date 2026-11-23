@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -98,7 +99,14 @@ func GeminiTextGenerationStreamHandler(c *gin.Context, info *relaycommon.RelayIn
 	helper.SetEventStreamHeaders(c)
 
 	return geminiStreamHandler(c, info, resp, func(data string, geminiResponse *dto.GeminiChatResponse) bool {
-		err := helper.StringData(c, data)
+		var err error
+		if slices.ContainsFunc(geminiResponse.Candidates, func(candidate dto.GeminiChatCandidate) bool {
+			return candidate.FinishReason != nil && *candidate.FinishReason != "" && *candidate.FinishReason != "FINISH_REASON_UNSPECIFIED"
+		}) {
+			err = helper.WriteStreamCompletionData(c, info.StreamStatus, data)
+		} else {
+			err = helper.StringData(c, data)
+		}
 		if err != nil {
 			logger.LogError(c, common.LogText("failed to write stream data: %s", err.Error()))
 			return false

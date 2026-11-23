@@ -107,6 +107,9 @@ func GeminiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, r
 			}
 			return false
 		}
+		if event.Type == "response.completed" {
+			info.StreamStatus.RecordDownstreamCompletion(nil)
+		}
 		return true
 	}
 	failResponsesStream := func(err error) bool {

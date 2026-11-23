@@ -201,7 +201,7 @@ func HandleFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, lastStream
 			response.SetSystemFingerprint(systemFingerprint)
 			helper.ObjectData(c, response)
 		}
-		helper.Done(c)
+		_ = helper.WriteStreamCompletionData(c, info.StreamStatus, "[DONE]")
 
 	case types.RelayFormatClaude:
 		var streamResponse dto.ChatCompletionsStreamResponse

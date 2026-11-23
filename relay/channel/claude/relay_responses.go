@@ -54,6 +54,9 @@ func ClaudeResponsesStreamHandler(c *gin.Context, resp *http.Response, info *rel
 			streamErr = types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
 			return false
 		}
+		if eventType == "response.completed" {
+			info.StreamStatus.RecordDownstreamCompletion(nil)
+		}
 		return true
 	}
 	sendResult := func(result relayconvert.ResponseResult) bool {

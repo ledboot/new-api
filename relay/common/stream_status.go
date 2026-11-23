@@ -49,12 +49,14 @@ type StreamStatus struct {
 	Errors     []StreamErrorEntry
 	ErrorCount int
 
-	response         ResponseOutcome
-	errorCode        string
-	errorType        string
-	errorStatus      int
-	incompleteReason string
-	expectsTerminal  bool
+	response                    ResponseOutcome
+	errorCode                   string
+	errorType                   string
+	errorStatus                 int
+	incompleteReason            string
+	expectsTerminal             bool
+	upstreamCompletionObserved  bool
+	downstreamCompletionWritten bool
 }
 
 // StreamOutcome holds classification facts only; upstream messages never
@@ -113,7 +115,35 @@ func (s *StreamStatus) RequireTerminal() {
 // MarkCompleted, MarkIncomplete and MarkCancelled keep the first terminal seen;
 // MarkFailed always wins because an error after completion is still a failure.
 func (s *StreamStatus) MarkCompleted() {
-	s.markTerminal(ResponseOutcomeCompleted, "")
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.upstreamCompletionObserved = true
+	if s.response == ResponseOutcomeUnknown {
+		s.response = ResponseOutcomeCompleted
+	}
+}
+
+// RecordDownstreamCompletion records a successful write and flush of the
+// downstream protocol's completion event. It does not classify the stream.
+func (s *StreamStatus) RecordDownstreamCompletion(err error) {
+	if s == nil || err != nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.downstreamCompletionWritten = true
+}
+
+func (s *StreamStatus) CompletionEvents() (upstreamObserved, downstreamWritten bool) {
+	if s == nil {
+		return false, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.upstreamCompletionObserved, s.downstreamCompletionWritten
 }
 
 func (s *StreamStatus) MarkIncomplete(reason string) {
