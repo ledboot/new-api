@@ -18,6 +18,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
+	"github.com/QuantumNous/new-api/relay/observability"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -591,6 +592,8 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 			policy.String(),
 			resp.Proto)
 	}
+
+	observability.ObserveResponse(c, resp)
 
 	if upID := resp.Header.Get(common2.RequestIdKey); upID != "" {
 		c.Set(common2.UpstreamRequestIdKey, upID)

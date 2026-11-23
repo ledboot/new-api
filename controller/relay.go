@@ -23,6 +23,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
+	"github.com/QuantumNous/new-api/relay/observability"
 	"github.com/QuantumNous/new-api/relay/requestplugin"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
@@ -200,6 +201,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	relayInfo.RetryIndex = 0
 	relayInfo.LastError = nil
 
+	previousChannel := 0
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
 		relayInfo.StreamStatus = nil
 		relayInfo.PerformanceBusinessRejection = false
@@ -231,6 +233,8 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		// The request plugins' reply checks read the answer this attempt
 		// writes; without a reply instance nothing changes.
+		attempt := observability.Start(c, relayInfo.OriginModelName, channel.Id, previousChannel, relayInfo.RetryIndex)
+		previousChannel = channel.Id
 		finishReply := requestplugin.Reply(c, relayFormat, relayInfo)
 		switch relayFormat {
 		case types.RelayFormatOpenAIRealtime:
@@ -245,6 +249,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		finishReply()
 
 		if newAPIError == nil {
+			attempt.Finish(c, c.Writer.Status(), relayInfo.StreamStatus, true)
 			service.MarkRequestPolicySuccess(c, relayInfo.StreamStatus)
 			relayInfo.LastError = nil
 			return
@@ -254,6 +259,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		relayInfo.LastError = newAPIError
 
 		decision := service.DecideRelayRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry())
+		attempt.Finish(c, newAPIError.StatusCode, relayInfo.StreamStatus, decision.Action != "retry")
 		service.RecordPolicyFailure(c, channel.Id, newAPIError, decision)
 		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError, relayInfo)
 
