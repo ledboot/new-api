@@ -23,18 +23,36 @@ import { useTranslation } from 'react-i18next'
 import { CopyButton } from '@/components/copy-button'
 import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
+import { toIntlLocale } from '@/i18n/languages'
+import { getCurrencyDisplay } from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 
-import { formatTimestamp, getPaymentMethodName, getStatusConfig } from '../lib/order-status'
+import {
+  formatTimestamp,
+  getPaymentMethodName,
+  getStatusConfig,
+} from '../lib/order-status'
 import { isAdminGrant, type OrderRecord } from '../types'
 
 export function useOrderColumns(
   isAdminView: boolean,
   actions?: { completing: boolean; onComplete: (tradeNo: string) => void }
 ): ColumnDef<OrderRecord>[] {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  useSystemConfigStore((state) => state.config.currency.quotaPerUnit)
+  const { quotaPerUnit } = getCurrencyDisplay().config
 
   return useMemo(() => {
+    const usdFormatter = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: 'USD',
+      currencyDisplay: 'code',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 6,
+    })
+
     const columns: ColumnDef<OrderRecord>[] = [
       {
         accessorKey: 'create_time',
@@ -81,20 +99,20 @@ export function useOrderColumns(
         header: t('Payment Method'),
         size: 140,
         accessorFn: (record) =>
-          record.payment_name ||
-          getPaymentMethodName(record.payment_method, t),
+          record.payment_name || getPaymentMethodName(record.payment_method, t),
         meta: { label: t('Payment Method') },
       },
       {
         id: 'amount',
         header: t('Amount'),
         size: 130,
-        // Administrative grants credit quota directly and take no payment, so
-        // they show the granted quota instead of a USD amount.
-        accessorFn: (record) =>
-          isAdminGrant(record)
-            ? formatNumber(record.amount)
-            : formatNumber(Number(record.wallet_amount ?? record.amount)),
+        accessorFn: (record) => Number(record.wallet_amount ?? record.amount),
+        cell: ({ row, getValue }) => {
+          const record = row.original
+          if (!isAdminGrant(record)) return formatNumber(getValue<number>())
+
+          return usdFormatter.format(record.amount / quotaPerUnit)
+        },
         meta: { label: t('Amount') },
       },
       {
@@ -138,7 +156,7 @@ export function useOrderColumns(
           )
         },
         meta: { label: t('Status') },
-      },
+      }
     )
 
     if (isAdminView && actions) {
@@ -167,5 +185,5 @@ export function useOrderColumns(
     }
 
     return columns
-  }, [actions, isAdminView, t])
+  }, [actions, isAdminView, locale, quotaPerUnit, t])
 }

@@ -27,6 +27,10 @@ import zh from '@/i18n/locales/zh.json'
 import { api } from '@/lib/api'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
+import {
+  DEFAULT_CURRENCY_CONFIG,
+  useSystemConfigStore,
+} from '@/stores/system-config-store'
 
 import { Orders } from '..'
 
@@ -79,6 +83,9 @@ beforeEach(async () => {
 afterEach(() => {
   vi.restoreAllMocks()
   clients.splice(0).forEach((client) => client.clear())
+  useSystemConfigStore
+    .getState()
+    .setConfig({ currency: DEFAULT_CURRENCY_CONFIG })
 })
 
 it('lists the signed-in user orders from the self endpoint', async () => {
@@ -103,29 +110,40 @@ it('lists the signed-in user orders from the self endpoint', async () => {
   expect(get.mock.calls[0][0]).toContain('/api/user/topup/self')
 })
 
-it('shows an administrative grant as a quota amount with no payment', async () => {
-  mockOrders([
-    {
-      id: 2,
-      user_id: 6,
-      amount: 500000,
-      money: 0,
-      trade_no: 'ADM6G1abcdefgh',
-      payment_method: 'admin_grant',
-      payment_provider: 'admin_grant',
-      create_time: 1_700_000_100,
-      status: 'success',
-    },
-  ])
-  setUser(1, ROLE.ADMIN, 'admin')
+it.each(['USD', 'CNY', 'CUSTOM', 'TOKENS'] as const)(
+  'shows an administrative grant in USD when system display is %s',
+  async (quotaDisplayType) => {
+    useSystemConfigStore.getState().setConfig({
+      currency: {
+        ...DEFAULT_CURRENCY_CONFIG,
+        quotaDisplayType,
+        usdExchangeRate: 7.3,
+        customCurrencyExchangeRate: 2,
+      },
+    })
+    mockOrders([
+      {
+        id: 2,
+        user_id: 6,
+        amount: 2500000,
+        money: 0,
+        trade_no: 'ADM6G1abcdefgh',
+        payment_method: 'admin_grant',
+        payment_provider: 'admin_grant',
+        create_time: 1_700_000_100,
+        status: 'success',
+      },
+    ])
+    setUser(1, ROLE.ADMIN, 'admin')
 
-  renderOrders()
+    renderOrders()
 
-  await screen.findByText('ADM6G1abcdefgh')
-  expect(screen.getByText('Admin Grant')).toBeVisible()
-  // The credited quota is shown, not the zero payment.
-  expect(screen.getByText('500,000')).toBeVisible()
-})
+    await screen.findByText('ADM6G1abcdefgh')
+    expect(screen.getByText('Admin Grant')).toBeVisible()
+    expect(screen.getByText('USD 5')).toBeVisible()
+    expect(screen.getByText('-', { selector: 'span' })).toBeVisible()
+  }
+)
 
 it('asks for the next page with server-side pagination', async () => {
   const get = mockOrders(
