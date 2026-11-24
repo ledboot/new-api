@@ -78,22 +78,41 @@ export function GeneralError({
     : t('Please try again later.')
 
   return (
-    <div className={cn('h-svh w-full', className)}>
-      <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
+    <div
+      className={cn(
+        'bg-background relative min-h-svh w-full overflow-hidden',
+        className
+      )}
+    >
+      {!minimal && (
+        <>
+          <div
+            aria-hidden='true'
+            className='tech-aurora-top pointer-events-none absolute inset-x-0 top-0 h-[480px]'
+          />
+          <div
+            aria-hidden='true'
+            className='tech-grid-bg pointer-events-none absolute inset-0'
+          />
+        </>
+      )}
+      <div className='relative m-auto flex min-h-svh w-full flex-col items-center justify-center gap-2.5 px-6 py-12 text-center'>
         {!minimal && status !== undefined && (
-          <h1 className='text-[7rem] leading-tight font-bold'>{status}</h1>
+          <h1 className='from-foreground to-foreground/45 bg-linear-to-b bg-clip-text font-mono text-[clamp(4.5rem,18vw,7.5rem)] leading-none font-bold tracking-tighter text-transparent'>
+            {status}
+          </h1>
         )}
-        <span className='font-medium'>{title}</span>
-        <p className='text-muted-foreground text-center'>
+        <span className='text-lg font-semibold tracking-tight'>{title}</span>
+        <p className='text-muted-foreground max-w-md text-center text-sm leading-relaxed'>
           {t('We apologize for the inconvenience.')} <br /> {description}
         </p>
         {!minimal && (
-          <p className='text-muted-foreground text-center text-sm'>
+          <p className='text-muted-foreground max-w-md text-center text-xs sm:text-sm'>
             {t('If this keeps happening, please report it on GitHub Issues.')}
           </p>
         )}
         {!minimal && (
-          <div className='mt-6 flex flex-wrap justify-center gap-4'>
+          <div className='mt-6 flex flex-wrap justify-center gap-3'>
             <Button variant='outline' onClick={() => history.go(-1)}>
               {t('Go Back')}
             </Button>

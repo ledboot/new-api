@@ -325,7 +325,7 @@ export function StatCard(props: StatCardProps) {
 
       {valueContent}
 
-      <div className='hidden sm:block'>{visualization}</div>
+      <div className='hidden min-[480px]:block'>{visualization}</div>
     </div>
   )
 }

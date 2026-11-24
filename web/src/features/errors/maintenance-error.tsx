@@ -23,17 +23,27 @@ import { Button } from '@/components/ui/button'
 export function MaintenanceError() {
   const { t } = useTranslation()
   return (
-    <div className='h-svh'>
-      <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
-        <h1 className='text-[7rem] leading-tight font-bold'>503</h1>
-        <span className='font-medium'>
+    <div className='bg-background relative min-h-svh overflow-hidden'>
+      <div
+        aria-hidden='true'
+        className='tech-aurora-top pointer-events-none absolute inset-x-0 top-0 h-[480px]'
+      />
+      <div
+        aria-hidden='true'
+        className='tech-grid-bg pointer-events-none absolute inset-0'
+      />
+      <div className='relative m-auto flex min-h-svh w-full flex-col items-center justify-center gap-2.5 px-6 py-12 text-center'>
+        <h1 className='from-foreground to-foreground/45 bg-linear-to-b bg-clip-text font-mono text-[clamp(4.5rem,18vw,7.5rem)] leading-none font-bold tracking-tighter text-transparent'>
+          503
+        </h1>
+        <span className='text-lg font-semibold tracking-tight'>
           {t('Website is under maintenance!')}
         </span>
-        <p className='text-muted-foreground text-center'>
+        <p className='text-muted-foreground max-w-md text-center text-sm leading-relaxed'>
           {t('The site is not available at the moment.')} <br />
           {t("We'll be back online shortly.")}
         </p>
-        <div className='mt-6 flex gap-4'>
+        <div className='mt-6 flex flex-wrap justify-center gap-3'>
           <Button variant='outline'>{t('Learn more')}</Button>
         </div>
       </div>

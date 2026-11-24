@@ -176,16 +176,16 @@ export function DataTableBulkActions<TData>({
         onKeyDown={handleKeyDown}
         className={cn(
           placement === 'floating'
-            ? 'fixed bottom-6 left-1/2 z-50 w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl transition-all delay-100 duration-300 ease-out hover:scale-105'
-            : 'shrink-0 rounded-xl',
+            ? 'animate-in fade-in-0 slide-in-from-bottom-3 fixed bottom-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.75rem))] left-1/2 z-50 w-max max-w-[calc(100vw-1.5rem)] -translate-x-1/2 rounded-2xl duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]'
+            : 'shrink-0 rounded-2xl',
           'focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none'
         )}
       >
         <div
           className={cn(
-            'p-2 shadow-xl',
-            'rounded-xl border',
-            'bg-background/95 supports-[backdrop-filter]:bg-background/60 backdrop-blur-lg',
+            'p-2 shadow-2xl',
+            'border-border/80 rounded-2xl border dark:border-white/[0.12]',
+            'bg-popover/92 supports-[backdrop-filter]:bg-popover/80 backdrop-blur-xl',
             'flex flex-wrap items-center gap-2'
           )}
         >

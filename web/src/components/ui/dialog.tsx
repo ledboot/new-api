@@ -48,7 +48,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot='dialog-overlay'
       className={cn(
-        'data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs',
+        'data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 fixed inset-0 isolate z-50 bg-black/35 duration-150 supports-backdrop-filter:backdrop-blur-[3px] dark:bg-black/60',
         className
       )}
       {...props}
@@ -70,7 +70,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot='dialog-content'
         className={cn(
-          'bg-popover text-popover-foreground ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 fixed top-[var(--dialog-viewport-center,50dvh)] left-1/2 z-50 grid max-h-[var(--dialog-available-height,calc(100dvh-2rem))] w-full overflow-y-auto overscroll-contain max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl p-4 text-sm ring-1 duration-100 outline-none sm:max-w-sm',
+          'bg-popover text-popover-foreground ring-border/80 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 fixed top-[var(--dialog-viewport-center,50dvh)] left-1/2 z-50 grid max-h-[var(--dialog-available-height,calc(100dvh-2rem))] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto overscroll-contain rounded-2xl p-4 text-sm shadow-2xl ring-1 duration-150 outline-none sm:max-w-sm dark:ring-white/[0.1]',
           className
         )}
         {...props}

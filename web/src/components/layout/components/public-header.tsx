@@ -17,6 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import { ArrowUpRight } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -31,6 +33,7 @@ import { useNotifications } from '@/hooks/use-notifications'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
 import { DEFAULT_LOGO, DEFAULT_SYSTEM_NAME } from '@/lib/constants'
+import { MOTION_TRANSITION } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -70,12 +73,14 @@ export function PublicHeader(props: PublicHeaderProps) {
     logo: customLogo,
     siteName: customSiteName,
     homeUrl = '/',
+    showNavigation = true,
     showAuthButtons = true,
     showNotifications = true,
   } = props
 
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const shouldReduceMotion = useReducedMotion()
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [authPromptTarget, setAuthPromptTarget] =
@@ -120,17 +125,17 @@ export function PublicHeader(props: PublicHeaderProps) {
   let authContent = (
     <Button
       size='sm'
-      className='h-8 rounded-lg px-3.5 text-xs font-medium'
+      className='h-8 rounded-xl px-3.5 text-xs font-semibold'
       render={<Link to='/sign-in' />}
     >
       {t('Sign in')}
     </Button>
   )
   if (isAuthenticated) authContent = <ProfileDropdown />
-  if (loading) authContent = <Skeleton className='h-8 w-20 rounded-lg' />
+  if (loading) authContent = <Skeleton className='h-8 w-20 rounded-xl' />
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20)
+    const onScroll = () => setScrolled(window.scrollY > 16)
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
@@ -206,29 +211,36 @@ export function PublicHeader(props: PublicHeaderProps) {
 
   return (
     <>
-      <header className='tokara-public-header pointer-events-none fixed inset-x-0 top-0 z-50'>
+      <header
+        className={cn(
+          'pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-2.5 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:px-5 sm:pt-3',
+          props.className
+        )}
+      >
         <div
           className={cn(
-            'pointer-events-auto mx-auto transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
-            'site-container px-4 md:px-6'
+            'tokara-public-island pointer-events-auto mx-auto transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]',
+            scrolled
+              ? 'max-w-6xl rounded-2xl px-3 sm:px-4'
+              : 'site-container rounded-2xl px-3.5 sm:px-5'
           )}
         >
           <nav
             className={cn(
-              'flex items-center justify-between gap-2 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
-              scrolled ? 'h-16 px-2' : 'h-20 px-2'
+              'flex items-center justify-between gap-2 transition-[height] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+              scrolled ? 'h-12 sm:h-13' : 'h-13 sm:h-14'
             )}
           >
-            {/* Logo */}
-            <div className='@container/system-brand flex min-w-0 flex-1 items-center gap-1 lg:min-w-36'>
+            {/* Left zone: Brand */}
+            <div className='@container/system-brand flex min-w-0 flex-1 items-center gap-2 lg:w-44 lg:flex-none'>
               <Link
                 to={homeUrl}
-                className='group flex min-w-0 items-center gap-2.5'
+                className='group flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-90'
               >
                 <div
                   className={cn(
                     'flex h-7 shrink-0 items-center justify-center',
-                    isTokaraBrand ? 'w-32' : 'w-7'
+                    isTokaraBrand ? 'w-28 sm:w-30' : 'w-7'
                   )}
                 >
                   {logoContent}
@@ -247,144 +259,196 @@ export function PublicHeader(props: PublicHeaderProps) {
                   )}
                 </span>
               </Link>
+              {props.leftContent}
             </div>
 
-            {/* Desktop nav */}
-            <div className='hidden min-w-0 items-center gap-0.5 lg:flex'>
-              {links.map((link) => {
-                const isActive = pathname === link.href
-                if (link.external) {
-                  return (
-                    <a
-                      key={`${link.title}:${link.href}`}
-                      href={link.href}
-                      title={t(link.title)}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      aria-disabled={link.disabled}
-                      tabIndex={link.disabled ? -1 : undefined}
-                      onClick={(event) => handleNavLinkClick(event, link)}
-                      className={cn(
-                        'text-muted-foreground hover:text-foreground min-w-0 truncate rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
-                        link.disabled && 'pointer-events-none opacity-50'
-                      )}
-                    >
-                      {t(link.title)}
-                    </a>
-                  )
-                }
-                return (
-                  <Link
-                    key={`${link.title}:${link.href}`}
-                    to={link.href}
-                    title={t(link.title)}
-                    disabled={link.disabled}
-                    onClick={(event) => handleNavLinkClick(event, link)}
-                    className={cn(
-                      'min-w-0 truncate rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
-                      isActive
-                        ? 'text-foreground'
-                        : 'text-muted-foreground hover:text-foreground',
-                      link.disabled && 'pointer-events-none opacity-50'
-                    )}
-                  >
-                    {t(link.title)}
-                  </Link>
-                )
-              })}
-
-              {(showLanguageSwitcher ||
-                showThemeSwitch ||
-                showNotifications) && (
-                <div className='bg-border/40 mx-2 h-4 w-px' />
-              )}
-
-              {showLanguageSwitcher && <LanguageSwitcher />}
-              {showThemeSwitch && <ThemeSwitch />}
-              {showNotifications && (
-                <NotificationPopover
-                  open={notifications.popoverOpen}
-                  onOpenChange={notifications.setPopoverOpen}
-                  unreadCount={notifications.unreadCount}
-                  activeTab={notifications.activeTab}
-                  onTabChange={notifications.setActiveTab}
-                  notice={notifications.notice}
-                  announcements={notifications.announcements}
-                  loading={notifications.loading}
-                />
-              )}
-
-              {showAuthButtons && (
-                <>
-                  <div className='bg-border/40 mx-1 h-4 w-px' />
-                  {authContent}
-                </>
-              )}
-            </div>
-
-            {/* Mobile: compact actions + hamburger */}
-            <div className='flex shrink-0 items-center gap-2 lg:hidden'>
-              {showThemeSwitch && <ThemeSwitch />}
-              {showAuthButtons && !loading && isAuthenticated && (
-                <ProfileDropdown />
-              )}
-              <Button
-                type='button'
-                variant='ghost'
-                size='icon'
-                className='size-9'
-                onClick={() => setMobileOpen((v) => !v)}
-                aria-label={t('Toggle navigation menu')}
-              >
-                <div className='relative size-4'>
-                  <span
-                    className={cn(
-                      'absolute inset-x-0 block h-[1.5px] origin-center rounded-full bg-current transition-all duration-300',
-                      mobileOpen ? 'top-[7px] rotate-45' : 'top-[3px]'
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      'absolute inset-x-0 top-[7px] block h-[1.5px] rounded-full bg-current transition-all duration-300',
-                      mobileOpen ? 'scale-x-0 opacity-0' : 'opacity-100'
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      'absolute inset-x-0 block h-[1.5px] origin-center rounded-full bg-current transition-all duration-300',
-                      mobileOpen ? 'top-[7px] -rotate-45' : 'top-[11px]'
-                    )}
-                  />
+            {/* Center zone: Segmented sliding-pill navigation track */}
+            {showNavigation &&
+              (props.navContent ?? (
+                <div className='border-border/60 bg-muted/50 hidden min-w-0 items-center gap-0.5 rounded-xl border p-1 lg:flex'>
+                  {links.map((link) => {
+                    const isActive = pathname === link.href
+                    if (link.external) {
+                      return (
+                        <a
+                          key={`${link.title}:${link.href}`}
+                          href={link.href}
+                          title={t(link.title)}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          aria-disabled={link.disabled}
+                          tabIndex={link.disabled ? -1 : undefined}
+                          onClick={(event) => handleNavLinkClick(event, link)}
+                          className={cn(
+                            'text-muted-foreground hover:text-foreground inline-flex min-w-0 items-center gap-1 truncate rounded-lg px-3 py-1 text-xs font-medium transition-colors duration-150',
+                            link.disabled && 'pointer-events-none opacity-50'
+                          )}
+                        >
+                          <span className='truncate'>{t(link.title)}</span>
+                          <ArrowUpRight
+                            className='size-3 opacity-60'
+                            aria-hidden='true'
+                          />
+                        </a>
+                      )
+                    }
+                    return (
+                      <Link
+                        key={`${link.title}:${link.href}`}
+                        to={link.href}
+                        title={t(link.title)}
+                        disabled={link.disabled}
+                        onClick={(event) => handleNavLinkClick(event, link)}
+                        className={cn(
+                          'relative min-w-0 truncate rounded-lg px-3 py-1 text-xs font-medium transition-colors duration-150',
+                          isActive
+                            ? 'text-foreground font-semibold'
+                            : 'text-muted-foreground hover:text-foreground',
+                          link.disabled && 'pointer-events-none opacity-50'
+                        )}
+                      >
+                        {isActive && (
+                          <motion.span
+                            layoutId={
+                              shouldReduceMotion
+                                ? undefined
+                                : 'public-nav-active-pill'
+                            }
+                            transition={MOTION_TRANSITION.spring}
+                            aria-hidden='true'
+                            className='bg-card ring-border/80 absolute inset-0 rounded-lg shadow-2xs ring-1 dark:ring-white/12'
+                          />
+                        )}
+                        <span className='relative z-10 flex items-center gap-1.5'>
+                          {isActive && (
+                            <span
+                              aria-hidden='true'
+                              className='bg-primary size-1.5 rounded-full shadow-[0_0_6px_var(--primary)]'
+                            />
+                          )}
+                          {t(link.title)}
+                        </span>
+                      </Link>
+                    )
+                  })}
                 </div>
-              </Button>
-            </div>
+              ))}
+
+            {/* Right zone: Desktop utilities & auth */}
+            {props.rightContent ? (
+              <div className='flex shrink-0 items-center gap-1.5'>
+                {props.rightContent}
+              </div>
+            ) : (
+              <>
+                <div className='hidden shrink-0 items-center gap-1 lg:flex lg:min-w-40 lg:justify-end'>
+                  {showLanguageSwitcher && <LanguageSwitcher />}
+                  {showThemeSwitch && <ThemeSwitch />}
+                  {showNotifications && (
+                    <NotificationPopover
+                      open={notifications.popoverOpen}
+                      onOpenChange={notifications.setPopoverOpen}
+                      unreadCount={notifications.unreadCount}
+                      activeTab={notifications.activeTab}
+                      onTabChange={notifications.setActiveTab}
+                      notice={notifications.notice}
+                      announcements={notifications.announcements}
+                      loading={notifications.loading}
+                    />
+                  )}
+                  {showAuthButtons && (
+                    <>
+                      <div className='bg-border/60 mx-1 h-4 w-px' />
+                      {authContent}
+                    </>
+                  )}
+                </div>
+
+                {/* Mobile: compact actions + animated hamburger */}
+                <div className='flex shrink-0 items-center gap-0.5 sm:gap-1 lg:hidden'>
+                  {showNotifications && (
+                    <NotificationPopover
+                      open={notifications.popoverOpen}
+                      onOpenChange={notifications.setPopoverOpen}
+                      unreadCount={notifications.unreadCount}
+                      activeTab={notifications.activeTab}
+                      onTabChange={notifications.setActiveTab}
+                      notice={notifications.notice}
+                      announcements={notifications.announcements}
+                      loading={notifications.loading}
+                    />
+                  )}
+                  {showLanguageSwitcher && <LanguageSwitcher />}
+                  {showThemeSwitch && <ThemeSwitch />}
+                  {showAuthButtons && !loading && isAuthenticated && (
+                    <ProfileDropdown />
+                  )}
+                  {showNavigation && (
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='icon'
+                      className='size-8 rounded-lg'
+                      onClick={() => setMobileOpen((v) => !v)}
+                      aria-expanded={mobileOpen}
+                      aria-label={t('Toggle navigation menu')}
+                    >
+                      <div className='relative size-4'>
+                        <span
+                          className={cn(
+                            'absolute inset-x-0 block h-[1.5px] origin-center rounded-full bg-current transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                            mobileOpen ? 'top-[7px] rotate-45' : 'top-[3px]'
+                          )}
+                        />
+                        <span
+                          className={cn(
+                            'absolute inset-x-0 top-[7px] block h-[1.5px] rounded-full bg-current transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                            mobileOpen ? 'scale-x-0 opacity-0' : 'opacity-100'
+                          )}
+                        />
+                        <span
+                          className={cn(
+                            'absolute inset-x-0 block h-[1.5px] origin-center rounded-full bg-current transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                            mobileOpen ? 'top-[7px] -rotate-45' : 'top-[11px]'
+                          )}
+                        />
+                      </div>
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </nav>
         </div>
       </header>
 
-      {/* Mobile full-screen overlay */}
+      {/* Mobile floating glass command overlay */}
       <div
         className={cn(
-          'bg-background/98 fixed inset-0 z-40 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] lg:pointer-events-none lg:hidden',
+          'bg-background/95 fixed inset-0 z-40 backdrop-blur-2xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] lg:pointer-events-none lg:hidden',
           mobileOpen
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0'
         )}
       >
-        <div className='flex h-full flex-col justify-between px-8 pt-20 pb-10'>
-          <nav className='flex flex-col gap-1'>
+        <div className='tech-grid-bg pointer-events-none absolute inset-0 opacity-55' />
+        <div className='relative flex h-full flex-col justify-between overflow-y-auto px-4 pt-20 pb-[max(1.75rem,env(safe-area-inset-bottom))]'>
+          <nav className='flex flex-col gap-2'>
             {links.map((link, i) => {
               const isActive = pathname === link.href
+              const indexTag = String(i + 1).padStart(2, '0')
               const linkClassName = cn(
-                'flex items-center gap-3 py-3 text-base font-medium tracking-tight transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                'flex min-h-12 items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium tracking-tight transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
                 mobileOpen
                   ? 'translate-y-0 opacity-100'
-                  : 'translate-y-4 opacity-0',
-                isActive ? 'text-foreground' : 'text-muted-foreground',
+                  : 'translate-y-3 opacity-0',
+                isActive
+                  ? 'border-primary/40 bg-primary/10 text-foreground shadow-xs'
+                  : 'border-border/65 bg-card/75 text-foreground/85 hover:border-primary/30 hover:bg-card',
                 link.disabled && 'pointer-events-none opacity-50'
               )
               const transitionStyle = {
-                transitionDelay: mobileOpen ? `${100 + i * 50}ms` : '0ms',
+                transitionDelay: mobileOpen ? `${50 + i * 35}ms` : '0ms',
               }
               if (link.external) {
                 return (
@@ -399,7 +463,16 @@ export function PublicHeader(props: PublicHeaderProps) {
                     className={linkClassName}
                     style={transitionStyle}
                   >
-                    {t(link.title)}
+                    <span className='flex items-center gap-3'>
+                      <span className='text-muted-foreground font-mono text-[11px] tabular-nums'>
+                        {indexTag}
+                      </span>
+                      <span>{t(link.title)}</span>
+                    </span>
+                    <ArrowUpRight
+                      aria-hidden='true'
+                      className='text-muted-foreground size-4'
+                    />
                   </a>
                 )
               }
@@ -412,7 +485,23 @@ export function PublicHeader(props: PublicHeaderProps) {
                   className={linkClassName}
                   style={transitionStyle}
                 >
-                  {t(link.title)}
+                  <span className='flex items-center gap-3'>
+                    <span
+                      className={cn(
+                        'font-mono text-[11px] tabular-nums',
+                        isActive ? 'text-primary' : 'text-muted-foreground'
+                      )}
+                    >
+                      {indexTag}
+                    </span>
+                    <span>{t(link.title)}</span>
+                  </span>
+                  {isActive && (
+                    <span
+                      aria-hidden='true'
+                      className='bg-primary size-2 rounded-full shadow-[0_0_8px_var(--primary)]'
+                    />
+                  )}
                 </Link>
               )
             })}
@@ -420,21 +509,26 @@ export function PublicHeader(props: PublicHeaderProps) {
 
           <div
             className={cn(
-              'flex flex-col gap-3 transition-all duration-500',
+              'mt-6 flex flex-col gap-3 transition-all duration-300',
               mobileOpen
                 ? 'translate-y-0 opacity-100'
-                : 'translate-y-4 opacity-0'
+                : 'translate-y-3 opacity-0'
             )}
-            style={{ transitionDelay: mobileOpen ? '250ms' : '0ms' }}
+            style={{ transitionDelay: mobileOpen ? '180ms' : '0ms' }}
           >
             {showAuthButtons && (
-              <Link
-                to={isAuthenticated ? '/dashboard' : '/sign-in'}
-                onClick={() => setMobileOpen(false)}
-                className='bg-foreground text-background inline-flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-opacity hover:opacity-90 active:opacity-80'
+              <Button
+                size='lg'
+                className='h-11 w-full rounded-xl text-sm font-semibold'
+                render={
+                  <Link
+                    to={isAuthenticated ? '/dashboard' : '/sign-in'}
+                    onClick={() => setMobileOpen(false)}
+                  />
+                }
               >
                 {isAuthenticated ? t('Go to Dashboard') : t('Sign in')}
-              </Link>
+              </Button>
             )}
           </div>
         </div>

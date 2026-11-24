@@ -104,11 +104,11 @@ export function DataTablePagination<TData>({
   return (
     <div
       className={cn(
-        '@container/pagination flex min-w-0 items-center justify-end overflow-clip'
+        '@container/pagination flex min-w-0 items-center justify-between overflow-clip @sm/pagination:justify-end'
       )}
       style={{ overflowClipMargin: 1 }}
     >
-      <div className='flex min-w-0 shrink-0 items-center gap-2 @xl/pagination:gap-3'>
+      <div className='flex w-full min-w-0 items-center justify-between gap-2 @sm/pagination:w-auto @sm/pagination:justify-end @xl/pagination:gap-3'>
         <div className='flex shrink-0 items-baseline gap-1.5 text-xs font-medium whitespace-nowrap sm:text-sm'>
           <span className='text-muted-foreground/80'>{t('Total:')}</span>
           <span className='text-foreground tabular-nums'>
@@ -162,8 +162,15 @@ export function DataTablePagination<TData>({
             <ChevronLeftIcon className='h-4 w-4' />
           </Button>
 
+          <span
+            className='text-muted-foreground px-1.5 text-xs font-medium tabular-nums @sm/pagination:hidden'
+            aria-live='polite'
+          >
+            {currentPage} / {Math.max(1, totalPages)}
+          </span>
+
           {pageItems.map(({ page: pageNumber, key }) => (
-            <div key={key} className='flex items-center'>
+            <div key={key} className='hidden items-center @sm/pagination:flex'>
               {pageNumber === '...' ? (
                 <span className='text-muted-foreground/60 px-0.5 text-sm @lg/pagination:px-1'>
                   ...

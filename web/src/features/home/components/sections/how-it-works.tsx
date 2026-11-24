@@ -52,11 +52,11 @@ export function HowItWorks() {
   ]
 
   return (
-    <section className='bg-muted/40 relative z-10 border-y px-6 py-16 md:py-20'>
-      <div className='mx-auto grid site-container items-center gap-10 lg:grid-cols-2 lg:gap-16'>
+    <section className='bg-muted/30 border-border/60 relative z-10 border-y px-5 py-16 sm:px-6 md:py-22'>
+      <div className='site-container mx-auto grid items-center gap-10 lg:grid-cols-2 lg:gap-16'>
         <div>
           <AnimateInView className='mb-9'>
-            <p className='text-primary mb-3 text-xs font-medium tracking-widest uppercase'>
+            <p className='text-primary mb-2.5 font-mono text-[11px] font-semibold tracking-[0.2em] uppercase'>
               {t('How It Works')}
             </p>
             <h2 className='text-2xl font-bold tracking-tight md:text-3xl'>
@@ -64,24 +64,32 @@ export function HowItWorks() {
             </h2>
           </AnimateInView>
 
-          <div className='grid gap-6'>
+          <div className='relative grid gap-6'>
             {steps.map((step, i) => (
               <AnimateInView
                 key={step.num}
-                delay={i * 150}
+                delay={i * 120}
                 animation='fade-up'
-                className='relative flex items-start gap-5'
+                className='group relative flex items-start gap-4 sm:gap-5'
               >
-                <div className='relative shrink-0'>
-                  <div className='text-muted-foreground border-border/50 bg-muted/30 flex size-12 items-center justify-center rounded-lg border transition-colors'>
+                {i < steps.length - 1 && (
+                  <span
+                    aria-hidden='true'
+                    className='bg-border/80 absolute top-13 -bottom-6 left-6 w-px'
+                  />
+                )}
+                <div className='relative z-10 shrink-0'>
+                  <div className='text-primary border-border/80 bg-card group-hover:border-primary/40 flex size-12 items-center justify-center rounded-xl border shadow-2xs transition-colors'>
                     {step.icon}
                   </div>
-                  <div className='bg-primary text-primary-foreground absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full text-xs font-bold'>
+                  <div className='bg-primary text-primary-foreground absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full font-mono text-[11px] font-bold shadow-xs'>
                     {step.num}
                   </div>
                 </div>
-                <div>
-                  <h3 className='mb-2 text-sm font-semibold'>{step.title}</h3>
+                <div className='pt-0.5'>
+                  <h3 className='mb-1.5 text-sm font-semibold tracking-tight sm:text-base'>
+                    {step.title}
+                  </h3>
                   <p className='text-muted-foreground max-w-md text-sm leading-relaxed'>
                     {step.desc}
                   </p>

@@ -253,24 +253,30 @@ export function SummaryCards() {
   })
 
   return (
-    <div className='bg-card overflow-hidden rounded-2xl border shadow-xs'>
-      <div className='grid xl:grid-cols-[minmax(0,1fr)_19rem]'>
-        <div className='flex flex-col gap-2.5 p-3 sm:gap-3 sm:p-5'>
-          <div className='flex flex-wrap items-start justify-between gap-3'>
-            <div className='flex flex-col gap-1'>
-              <h3 className='text-sm font-semibold sm:text-base'>
+    <div className='bg-card border-border/80 overflow-hidden rounded-2xl border shadow-2xs dark:border-white/[0.08]'>
+      <div className='grid xl:grid-cols-[minmax(0,1fr)_20rem]'>
+        <div className='flex flex-col gap-3.5 p-3.5 sm:p-5'>
+          <div className='flex flex-wrap items-center justify-between gap-3'>
+            <div className='flex flex-col gap-0.5'>
+              <h3 className='text-sm font-semibold tracking-tight sm:text-base'>
                 {t('Usage at a glance')}
               </h3>
-              <p className='text-muted-foreground text-xs sm:text-sm'>
+              <p className='text-muted-foreground text-xs'>
                 {t('Monitor balance, usage, and request volume')}
               </p>
             </div>
+            <span
+              aria-hidden='true'
+              className='text-muted-foreground/65 hidden font-mono text-[10px] tracking-[0.18em] uppercase sm:inline'
+            >
+              TELEMETRY · 24H
+            </span>
           </div>
-          <StaggerContainer className='grid grid-cols-3 gap-1.5 sm:gap-3'>
+          <StaggerContainer className='border-border/75 bg-muted/25 divide-border/65 grid grid-cols-1 divide-y overflow-hidden rounded-xl border min-[480px]:grid-cols-3 min-[480px]:divide-x min-[480px]:divide-y-0'>
             {items.map((it) => (
               <StaggerItem
                 key={it.key}
-                className='bg-background/60 rounded-lg border px-2 py-1.5 sm:rounded-xl sm:p-3'
+                className='hover:bg-card/80 p-3.5 transition-colors duration-150 sm:p-4'
               >
                 <StatCard
                   title={it.title}
@@ -288,47 +294,54 @@ export function SummaryCards() {
           </StaggerContainer>
         </div>
 
-        <div className='flex flex-col justify-between gap-3 border-t bg-[linear-gradient(135deg,color-mix(in_oklch,var(--overview-accent-2)_12%,var(--background))_0%,color-mix(in_oklch,oklch(0.82_0.04_155)_8%,var(--background))_48%,color-mix(in_oklch,var(--overview-accent-1)_7%,var(--background))_100%)] p-3 sm:gap-4 sm:p-5 xl:border-t-0 xl:border-l'>
-          <div className='flex flex-col gap-2 sm:gap-3'>
+        <div className='relative flex flex-col justify-between gap-3.5 overflow-hidden border-t border-white/10 bg-[#080d19] p-4 text-slate-100 sm:gap-4 sm:p-5 xl:border-t-0 xl:border-l'>
+          <div
+            aria-hidden='true'
+            className='pointer-events-none absolute -top-16 -right-16 size-44 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.22)_0%,transparent_70%)]'
+          />
+          <div className='relative z-10 flex flex-col gap-2.5 sm:gap-3'>
             <div className='flex items-center justify-between'>
-              <span className='text-muted-foreground text-xs font-medium'>
+              <span className='font-mono text-[11px] font-medium tracking-wider text-slate-400 uppercase'>
                 {t('Credit remaining')}
               </span>
-              <span className='flex items-center gap-1.5'>
+              <span className='inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5'>
                 <span
                   className={cn('size-1.5 rounded-full', healthCfg.dotClass)}
                   aria-hidden='true'
                 />
-                <span className='text-muted-foreground text-[11px] font-medium'>
+                <span className='text-[11px] font-medium text-slate-200'>
                   {t(healthCfg.labelKey)}
                 </span>
               </span>
             </div>
 
-            <div className='font-mono text-xl font-semibold tracking-tight sm:text-2xl'>
+            <div className='font-mono text-2xl font-bold tracking-tight text-white sm:text-3xl'>
               {formatQuota(remainQuota)}
             </div>
 
             <div className='grid grid-cols-2 gap-2'>
-              <div className='bg-background/60 rounded-lg px-2.5 py-2'>
-                <div className='text-muted-foreground flex items-center gap-1 text-[11px] leading-none font-medium'>
-                  <Flame className='size-3 shrink-0' aria-hidden='true' />
+              <div className='rounded-xl border border-white/[0.08] bg-white/[0.04] px-2.5 py-2'>
+                <div className='flex items-center gap-1 text-[11px] leading-none font-medium text-slate-400'>
+                  <Flame
+                    className='size-3 shrink-0 text-sky-400'
+                    aria-hidden='true'
+                  />
                   <span className='truncate'>{t('Last 24h usage')}</span>
                 </div>
-                <div className='text-foreground mt-1.5 truncate text-xs font-semibold tabular-nums'>
+                <div className='mt-1.5 truncate font-mono text-xs font-semibold text-white tabular-nums'>
                   {formatQuota(recentUsage)}
                 </div>
               </div>
-              <div className='bg-background/60 rounded-lg px-2.5 py-2'>
-                <div className='text-muted-foreground flex items-center gap-1 text-[11px] leading-none font-medium'>
+              <div className='rounded-xl border border-white/[0.08] bg-white/[0.04] px-2.5 py-2'>
+                <div className='flex items-center gap-1 text-[11px] leading-none font-medium text-slate-400'>
                   {runwayDays !== null && runwayDays < 3 ? (
                     <TrendingDown
-                      className='size-3 shrink-0'
+                      className='size-3 shrink-0 text-amber-400'
                       aria-hidden='true'
                     />
                   ) : (
                     <ShieldCheck
-                      className='size-3 shrink-0'
+                      className='size-3 shrink-0 text-emerald-400'
                       aria-hidden='true'
                     />
                   )}
@@ -336,9 +349,9 @@ export function SummaryCards() {
                 </div>
                 <div
                   className={cn(
-                    'mt-1.5 truncate text-xs font-semibold tabular-nums',
-                    healthLevel === 'critical' && 'text-destructive',
-                    healthLevel === 'caution' && 'text-warning'
+                    'mt-1.5 truncate font-mono text-xs font-semibold text-white tabular-nums',
+                    healthLevel === 'critical' && 'text-rose-400',
+                    healthLevel === 'caution' && 'text-amber-300'
                   )}
                 >
                   {runwayDisplay}
@@ -347,7 +360,10 @@ export function SummaryCards() {
             </div>
           </div>
 
-          <Button className='justify-between' render={<Link to='/wallet' />}>
+          <Button
+            className='relative z-10 justify-between rounded-xl'
+            render={<Link to='/wallet' />}
+          >
             <span>{t('Wallet')}</span>
             <ArrowRight data-icon='inline-end' />
           </Button>

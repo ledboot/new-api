@@ -95,69 +95,70 @@ For commercial licensing, please contact support@quantumnous.com
 }
 
 :root {
-  --radius: 0.5rem;
-  --app-header-height: 3rem;
+  --radius: 0.625rem;
+  --app-header-height: 3.25rem;
   /* Static build-channel fallback consumed when JS hasn't booted yet. */
   --app-rev: '2k6e8r7p';
-  /* Tokara uses the bundled sans face with local CJK fallbacks.
+  /* Crisp geometric sans stack with local CJK fallbacks.
    * Explicit font preferences remain controlled by theme-presets.css. */
   --font-ui-sans:
-    'Public Sans Variable', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    'Public Sans Variable', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --font-body: var(--font-ui-sans);
-  --background: #fafbf8;
-  --foreground: #182e2c;
-  --card: #ffffff;
-  --card-foreground: #182e2c;
+  --background: oklch(0.99 0.003 255);
+  --foreground: oklch(0.148 0.022 258);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.148 0.022 258);
   --popover: oklch(1 0 0);
-  --popover-foreground: #182e2c;
-  --primary: #02776f;
-  --primary-foreground: oklch(1 0 0);
-  --secondary: #e9f2eb;
-  --secondary-foreground: #005c56;
-  --muted: #f1f4ed;
-  --muted-foreground: #65746b;
-  --accent: color-mix(in oklch, var(--primary) 12%, var(--background));
-  --accent-foreground: #005c56;
+  --popover-foreground: oklch(0.148 0.022 258);
+  --primary: oklch(0.555 0.215 258);
+  --primary-foreground: oklch(0.992 0.003 255);
+  --secondary: oklch(0.952 0.012 255);
+  --secondary-foreground: oklch(0.24 0.038 258);
+  --muted: oklch(0.958 0.007 255);
+  --muted-foreground: oklch(0.465 0.022 256);
+  --accent: color-mix(in oklch, var(--primary) 9%, var(--background));
+  --accent-foreground: oklch(0.22 0.045 258);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.596 0.145 163.225);
+  --success: oklch(0.596 0.155 162.5);
   --success-foreground: oklch(0.985 0 0);
   --warning: oklch(0.681 0.162 75.834);
   --warning-foreground: oklch(0.145 0 0);
-  --info: oklch(0.588 0.158 241.966);
+  --info: oklch(0.588 0.168 242);
   --info-foreground: oklch(0.985 0 0);
-  --neutral: oklch(0.708 0 0);
-  --neutral-foreground: oklch(0.145 0 0);
-  --border: #e4e8e1;
-  --input: #d6ded3;
-  --ring: #02776f;
-  --chart-1: #02776f;
-  --chart-2: #72956a;
-  --chart-3: #93a882;
-  --chart-4: #467e87;
-  --chart-5: #b09566;
-  --overview-accent-1: #02776f;
-  --overview-accent-2: #72956a;
-  --overview-accent-3: #93a882;
-  --sidebar: color-mix(in oklch, var(--foreground) 0.5%, var(--background));
-  --sidebar-foreground: #182e2c;
-  --sidebar-primary: #02776f;
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: color-mix(in oklch, var(--primary) 12%, var(--background));
-  --sidebar-accent-foreground: #005c56;
-  --sidebar-border: #e4e8e1;
-  --sidebar-ring: #02776f;
-  --skeleton-base: #edf1e8;
-  --skeleton-highlight: oklch(0.985 0 0);
-  --table-row: var(--background);
+  --neutral: oklch(0.68 0.015 255);
+  --neutral-foreground: oklch(0.155 0.02 258);
+  --border: oklch(0.908 0.009 255);
+  --input: oklch(0.89 0.011 255);
+  --ring: oklch(0.555 0.215 258);
+  --chart-1: oklch(0.555 0.215 258);
+  --chart-2: oklch(0.635 0.155 202);
+  --chart-3: oklch(0.585 0.205 288);
+  --chart-4: oklch(0.655 0.155 162);
+  --chart-5: oklch(0.685 0.165 68);
+  --overview-accent-1: var(--chart-1);
+  --overview-accent-2: var(--chart-2);
+  --overview-accent-3: var(--chart-3);
+  --sidebar: oklch(0.962 0.006 255);
+  --sidebar-foreground: oklch(0.18 0.02 258);
+  --sidebar-primary: oklch(0.555 0.215 258);
+  --sidebar-primary-foreground: oklch(0.992 0.003 255);
+  --sidebar-accent: color-mix(in oklch, var(--primary) 11%, var(--card));
+  --sidebar-accent-foreground: oklch(0.22 0.055 258);
+  --sidebar-border: oklch(0.905 0.009 255);
+  --sidebar-ring: oklch(0.555 0.215 258);
+  --skeleton-base: oklch(0.945 0.006 255);
+  --skeleton-highlight: oklch(0.992 0.002 255);
+  --table-row: var(--card);
   --table-header: color-mix(
     in oklch,
-    var(--foreground) 1.5%,
+    var(--foreground) 2.2%,
     var(--background)
   );
   --table-header-hover: color-mix(
     in oklch,
-    var(--foreground) 3%,
+    var(--foreground) 4%,
     var(--background)
   );
   /* Disabled rows: kept subtle so they read as "quiet", not as a colored
@@ -183,72 +184,68 @@ For commercial licensing, please contact support@quantumnous.com
   /* Native controls follow the theme; Dark Reader also reads this to detect
      the built-in dark theme. */
   color-scheme: dark;
-  /* Tokara night palette keeps the same teal identity and readable surfaces. */
-  --background: #101c1b;
-  --foreground: #edf4ed;
-  --card: #172725;
-  --card-foreground: oklch(0.965 0 0);
-  --popover: #1b2e2b;
-  --popover-foreground: oklch(0.965 0 0);
-  --primary: #67c7b7;
-  --primary-foreground: #102c28;
-  --secondary: #203a32;
-  --secondary-foreground: #b5e2d6;
-  --muted: #1b2e29;
-  --muted-foreground: #a1b5a9;
-  --accent: color-mix(in oklch, var(--primary) 20%, var(--background));
-  --accent-foreground: oklch(0.985 0 0);
+  /* Deep obsidian space surfaces with 3-tier spatial depth & luminous cobalt-cyan accents. */
+  --background: oklch(0.142 0.017 260);
+  --foreground: oklch(0.968 0.005 252);
+  --card: oklch(0.18 0.02 259);
+  --card-foreground: oklch(0.968 0.005 252);
+  --popover: oklch(0.202 0.021 259);
+  --popover-foreground: oklch(0.968 0.005 252);
+  --primary: oklch(0.685 0.178 252);
+  --primary-foreground: oklch(0.13 0.022 258);
+  --secondary: oklch(0.232 0.024 258);
+  --secondary-foreground: oklch(0.925 0.015 252);
+  --muted: oklch(0.212 0.019 260);
+  --muted-foreground: oklch(0.69 0.018 255);
+  --accent: color-mix(in oklch, var(--primary) 16%, var(--background));
+  --accent-foreground: oklch(0.975 0.005 252);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.696 0.17 162.48);
+  --success: oklch(0.715 0.168 162.48);
   --success-foreground: oklch(0.145 0 0);
   --warning: oklch(0.769 0.188 70.08);
   --warning-foreground: oklch(0.145 0 0);
-  --info: oklch(0.613 0.14 239.919);
+  --info: oklch(0.665 0.15 242);
   --info-foreground: oklch(0.145 0 0);
-  --neutral: oklch(0.76 0 0);
+  --neutral: oklch(0.76 0.012 255);
   --neutral-foreground: oklch(0.155 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 17%);
-  --ring: #67c7b7;
-  --chart-1: #67c7b7;
-  --chart-2: #a2be8d;
-  --chart-3: #b8cda5;
-  --chart-4: #81bbc3;
-  --chart-5: #d7bc8c;
-  --overview-accent-1: #67c7b7;
-  --overview-accent-2: #a2be8d;
-  --overview-accent-3: #b8cda5;
-  --sidebar: #13211e;
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: #67c7b7;
-  --sidebar-primary-foreground: #102c28;
-  --sidebar-accent: color-mix(in oklch, var(--primary) 20%, var(--background));
-  --sidebar-accent-foreground: #b5e2d6;
-  --sidebar-border: oklch(1 0 0 / 11%);
-  --sidebar-ring: #67c7b7;
-  --skeleton-base: oklch(0.335 0 0);
-  --skeleton-highlight: oklch(0.44 0 0);
-  --table-row: var(--background);
-  --table-header: color-mix(in oklch, var(--foreground) 6%, var(--background));
-  --table-header-hover: color-mix(
-    in oklch,
-    var(--foreground) 9%,
-    var(--background)
-  );
+  --border: oklch(1 0 0 / 10.5%);
+  --input: oklch(1 0 0 / 15.5%);
+  --ring: oklch(0.685 0.178 252);
+  --chart-1: oklch(0.685 0.178 252);
+  --chart-2: oklch(0.75 0.145 198);
+  --chart-3: oklch(0.705 0.175 290);
+  --chart-4: oklch(0.74 0.155 162);
+  --chart-5: oklch(0.78 0.155 72);
+  --overview-accent-1: var(--chart-1);
+  --overview-accent-2: var(--chart-2);
+  --overview-accent-3: var(--chart-3);
+  --sidebar: oklch(0.112 0.016 262);
+  --sidebar-foreground: oklch(0.945 0.006 252);
+  --sidebar-primary: oklch(0.685 0.178 252);
+  --sidebar-primary-foreground: oklch(0.13 0.022 258);
+  --sidebar-accent: color-mix(in oklch, var(--primary) 16%, var(--card));
+  --sidebar-accent-foreground: oklch(0.96 0.012 252);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.685 0.178 252);
+  --skeleton-base: oklch(0.225 0.018 260);
+  --skeleton-highlight: oklch(0.305 0.02 260);
+  --table-row: var(--card);
+  --table-header: color-mix(in oklch, var(--foreground) 4.5%, var(--card));
+  --table-header-hover: color-mix(in oklch, var(--foreground) 8%, var(--card));
   --table-disabled: color-mix(
     in oklch,
-    var(--foreground) 7%,
+    var(--foreground) 6%,
     var(--background)
   );
   --table-disabled-hover: color-mix(
     in oklch,
-    var(--foreground) 9.5%,
+    var(--foreground) 8.5%,
     var(--background)
   );
   --table-disabled-border: color-mix(
     in oklch,
-    var(--foreground) 24%,
+    var(--foreground) 22%,
     var(--background)
   );
 }

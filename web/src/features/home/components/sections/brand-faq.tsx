@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AnimateInView } from '@/components/animate-in-view'
@@ -95,17 +96,21 @@ export function BrandFaq(props: BrandFaqProps) {
           </ul>
         </div>
 
-        <div className='border-border/60 bg-muted/20 rounded-xl border p-6 md:p-8'>
-          <h3 className='text-base font-semibold'>
+        <div className='border-border/80 bg-card/85 rounded-2xl border p-5 shadow-2xs sm:p-8'>
+          <h3 className='text-base font-semibold tracking-tight'>
             {t('Frequently asked questions about Tokara')}
           </h3>
           <div className='divide-border/60 mt-4 divide-y'>
             {questions.map((item) => (
-              <details key={item.question} className='group py-3'>
-                <summary className='hover:text-primary cursor-pointer list-none text-sm font-medium transition-colors'>
-                  {item.question}
+              <details key={item.question} className='group py-3.5'>
+                <summary className='hover:text-primary flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium transition-colors [&::-webkit-details-marker]:hidden'>
+                  <span>{item.question}</span>
+                  <ChevronDown
+                    aria-hidden='true'
+                    className='text-muted-foreground size-4 shrink-0 transition-transform duration-200 group-open:rotate-180'
+                  />
                 </summary>
-                <p className='text-muted-foreground mt-2 text-sm leading-relaxed'>
+                <p className='text-muted-foreground mt-2.5 pr-6 text-sm leading-relaxed'>
                   {item.answer}
                 </p>
               </details>

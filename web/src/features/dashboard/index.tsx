@@ -331,16 +331,22 @@ export function Dashboard() {
       <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
         <div className='space-y-3 sm:space-y-4'>
-          <div className='flex flex-wrap items-center justify-between gap-1.5 sm:gap-2'>
+          <div className='flex flex-wrap items-center justify-between gap-2'>
             {showSectionTabs ? (
-              <Tabs value={activeSection} onValueChange={handleSectionChange}>
-                <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
-                  {visibleSections.map((section) => (
-                    <TabsTrigger key={section} value={section}>
-                      {t(SECTION_META[section].titleKey)}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+              <Tabs
+                value={activeSection}
+                onValueChange={handleSectionChange}
+                className='max-w-full min-w-0'
+              >
+                <div className='no-scrollbar max-w-full overflow-x-auto'>
+                  <TabsList className='w-max justify-start'>
+                    {visibleSections.map((section) => (
+                      <TabsTrigger key={section} value={section}>
+                        {t(SECTION_META[section].titleKey)}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
               </Tabs>
             ) : (
               <div />

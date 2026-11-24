@@ -26,15 +26,27 @@ export function UnauthorisedError() {
   const navigate = useNavigate()
   const { history } = useRouter()
   return (
-    <div className='h-svh'>
-      <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
-        <h1 className='text-[7rem] leading-tight font-bold'>401</h1>
-        <span className='font-medium'>{t('Unauthorized Access')}</span>
-        <p className='text-muted-foreground text-center'>
+    <div className='bg-background relative min-h-svh overflow-hidden'>
+      <div
+        aria-hidden='true'
+        className='tech-aurora-top pointer-events-none absolute inset-x-0 top-0 h-[480px]'
+      />
+      <div
+        aria-hidden='true'
+        className='tech-grid-bg pointer-events-none absolute inset-0'
+      />
+      <div className='relative m-auto flex min-h-svh w-full flex-col items-center justify-center gap-2.5 px-6 py-12 text-center'>
+        <h1 className='from-foreground to-foreground/45 bg-linear-to-b bg-clip-text font-mono text-[clamp(4.5rem,18vw,7.5rem)] leading-none font-bold tracking-tighter text-transparent'>
+          401
+        </h1>
+        <span className='text-lg font-semibold tracking-tight'>
+          {t('Unauthorized Access')}
+        </span>
+        <p className='text-muted-foreground max-w-md text-center text-sm leading-relaxed'>
           {t('Please log in with the appropriate credentials')} <br />{' '}
           {t('to access this resource.')}
         </p>
-        <div className='mt-6 flex gap-4'>
+        <div className='mt-6 flex flex-wrap justify-center gap-3'>
           <Button variant='outline' onClick={() => history.go(-1)}>
             {t('Go Back')}
           </Button>

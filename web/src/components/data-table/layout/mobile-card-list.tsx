@@ -160,9 +160,9 @@ export function MobileCardList<TData>(props: MobileCardListProps<TData>) {
   }
 
   return (
-    <div className='divide-y overflow-hidden rounded-lg border'>
+    <div className='border-border/80 divide-border/70 bg-card divide-y overflow-hidden rounded-xl border shadow-2xs dark:border-white/[0.08]'>
       {enableRowSelection && (
-        <label className='flex items-center gap-2 px-3 py-2 text-xs'>
+        <label className='bg-muted/30 flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-medium'>
           <Checkbox
             checked={table.getIsAllPageRowsSelected()}
             indeterminate={table.getIsSomePageRowsSelected()}
@@ -175,19 +175,21 @@ export function MobileCardList<TData>(props: MobileCardListProps<TData>) {
       )}
       {rows.map((row) => {
         const key = getRowKey ? getRowKey(row) : row.id
+        const isSelected = row.getIsSelected()
         return (
           <div
             key={key}
+            data-state={isSelected ? 'selected' : undefined}
             className={cn(
-              '[background-color:var(--data-table-card-bg,var(--table-row))] px-3 py-2.5',
+              'transition-colors duration-150 [background-color:var(--data-table-card-bg,var(--table-row))] px-3.5 py-3 data-[state=selected]:[--data-table-card-bg:color-mix(in_oklch,var(--primary)_7%,var(--table-row))]',
               getRowClassName?.(row)
             )}
           >
-            <div className='flex min-w-0 items-start gap-2'>
+            <div className='flex min-w-0 items-start gap-2.5'>
               {enableRowSelection && (
                 <Checkbox
                   className='mt-0.5'
-                  checked={row.getIsSelected()}
+                  checked={isSelected}
                   onCheckedChange={(value) =>
                     row.toggleSelected(Boolean(value))
                   }

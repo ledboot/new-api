@@ -26,6 +26,7 @@ import { toast } from 'sonner'
 import { ErrorState } from '@/components/error-state'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { LoadingState } from '@/components/loading-state'
+import { ThemeSwitch } from '@/components/theme-switch'
 import {
   Card,
   CardContent,
@@ -283,20 +284,29 @@ export function SetupWizard() {
   }
 
   return (
-    <div className='bg-muted/40 relative min-h-svh py-10'>
-      <div className='absolute top-4 right-4 sm:top-6 sm:right-6'>
+    <div className='bg-background relative min-h-svh overflow-x-hidden py-10 pb-[max(2.5rem,env(safe-area-inset-bottom))]'>
+      <div
+        aria-hidden='true'
+        className='tech-aurora-top pointer-events-none absolute inset-x-0 top-0 h-[520px]'
+      />
+      <div
+        aria-hidden='true'
+        className='tech-grid-bg pointer-events-none absolute inset-0'
+      />
+      <div className='absolute top-4 right-4 z-10 flex items-center gap-1 sm:top-6 sm:right-6'>
         <LanguageSwitcher />
+        <ThemeSwitch />
       </div>
-      <div className='container mx-auto flex max-w-5xl flex-col gap-8 px-4 sm:px-6'>
-        <div className='flex flex-col items-center gap-3'>
-          <div className='relative h-12 w-12'>
+      <div className='relative z-10 container mx-auto flex max-w-5xl flex-col gap-8 px-4 sm:px-6'>
+        <div className='flex flex-col items-center gap-3 pt-4 sm:pt-0'>
+          <div className='relative size-12'>
             {systemConfigLoading ? (
-              <Skeleton className='absolute inset-0 rounded-full' />
+              <Skeleton className='absolute inset-0 rounded-xl' />
             ) : (
               <img
                 src={logo}
                 alt={t('System logo')}
-                className='h-12 w-12 rounded-full object-cover shadow-sm'
+                className='size-12 rounded-xl object-contain shadow-xs'
               />
             )}
           </div>
@@ -307,14 +317,14 @@ export function SetupWizard() {
               {t('Initialize')} {systemName}
             </h1>
           )}
-          <p className='text-muted-foreground text-center text-sm sm:text-base'>
+          <p className='text-muted-foreground max-w-lg text-center text-sm sm:text-base'>
             {t(
               'Follow the guided steps to prepare your workspace before the first login.'
             )}
           </p>
         </div>
 
-        <Card className='shadow-lg'>
+        <Card className='bg-card/90 rounded-2xl shadow-xl backdrop-blur-xl'>
           <CardHeader className='space-y-2'>
             <CardTitle className='text-xl font-semibold'>
               {t('System setup wizard')}

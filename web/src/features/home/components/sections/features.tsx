@@ -25,73 +25,111 @@ import {
   DollarSign,
   Users,
   HeartHandshake,
+  Check,
 } from 'lucide-react'
+import type { PointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AnimateInView } from '@/components/animate-in-view'
+import { cn } from '@/lib/utils'
 
 interface FeaturesProps {
   className?: string
 }
 
-export function Features(_props: FeaturesProps) {
+function handleSpotlightMove(event: PointerEvent<HTMLDivElement>) {
+  const rect = event.currentTarget.getBoundingClientRect()
+  event.currentTarget.style.setProperty(
+    '--mouse-x',
+    `${event.clientX - rect.left}px`
+  )
+  event.currentTarget.style.setProperty(
+    '--mouse-y',
+    `${event.clientY - rect.top}px`
+  )
+}
+
+export function Features(props: FeaturesProps) {
   const { t } = useTranslation()
 
   const features = [
     {
       id: 'fast',
       num: '01',
+      tag: 'LOW-LATENCY MESH',
       title: t('Lightning Fast'),
       desc: t(
         'Optimized network architecture ensures millisecond response times'
       ),
-      span: 'md:col-span-1',
+      span: 'lg:col-span-7',
       icon: <Zap className='text-primary size-4' />,
       visual: (
-        <div className='mt-4 grid grid-cols-3 gap-2'>
-          {['OpenAI', 'Claude', 'Gemini', 'DeepSeek', 'Qwen', 'Llama'].map(
-            (name) => (
-              <div
-                key={name}
-                className='border-border/30 bg-muted/20 text-muted-foreground hover:border-primary/30 hover:bg-primary/5 flex items-center justify-center rounded-lg border px-3 py-2 text-xs transition-colors duration-300'
-              >
-                {name}
+        <div className='mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3'>
+          {[
+            { name: 'OpenAI', ms: '12ms', bar: 'w-4/5' },
+            { name: 'Claude', ms: '15ms', bar: 'w-3/4' },
+            { name: 'Gemini', ms: '9ms', bar: 'w-11/12' },
+            { name: 'DeepSeek', ms: '14ms', bar: 'w-4/5' },
+            { name: 'Qwen', ms: '11ms', bar: 'w-5/6' },
+            { name: 'Llama', ms: '8ms', bar: 'w-11/12' },
+          ].map((item) => (
+            <div
+              key={item.name}
+              className='border-border/65 bg-background/65 hover:border-primary/40 flex flex-col gap-2 rounded-xl border p-2.5 transition-colors duration-200'
+            >
+              <div className='flex items-center justify-between gap-2'>
+                <span className='truncate text-xs font-semibold'>
+                  {item.name}
+                </span>
+                <span className='text-primary font-mono text-[10px] tabular-nums'>
+                  {item.ms}
+                </span>
               </div>
-            )
-          )}
+              <div className='bg-muted h-1 overflow-hidden rounded-full'>
+                <div
+                  className={cn(
+                    'from-primary to-chart-2 h-full rounded-full bg-linear-to-r',
+                    item.bar
+                  )}
+                />
+              </div>
+            </div>
+          ))}
         </div>
       ),
     },
     {
       id: 'secure',
       num: '02',
+      tag: 'ZERO-TRUST GUARD',
       title: t('Secure & Reliable'),
       desc: t(
         'Enterprise-grade security with comprehensive permission management'
       ),
-      span: 'md:col-span-1',
+      span: 'lg:col-span-5',
       icon: <Shield className='text-primary size-4' />,
       visual: (
-        <div className='mt-4 flex items-center justify-center'>
-          <div className='relative'>
-            <div className='border-primary/20 bg-primary/5 flex size-16 items-center justify-center rounded-2xl border'>
-              <Shield className='text-primary size-7' strokeWidth={1.5} />
+        <div className='border-border/65 bg-background/60 mt-6 flex items-center justify-between gap-4 rounded-xl border p-3.5'>
+          <div className='relative flex size-14 shrink-0 items-center justify-center'>
+            <div className='border-primary/20 absolute inset-0 rounded-2xl border border-dashed' />
+            <div className='border-primary/30 bg-primary/10 flex size-11 items-center justify-center rounded-xl border'>
+              <Shield className='text-primary size-5' strokeWidth={1.75} />
             </div>
-            <div className='bg-primary absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full'>
-              <svg
-                className='size-2.5 text-white'
-                fill='none'
-                viewBox='0 0 24 24'
-                stroke='currentColor'
-                strokeWidth={3}
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  d='m4.5 12.75 6 6 9-13.5'
-                />
-              </svg>
-            </div>
+            <span className='bg-success text-success-foreground absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full shadow-xs'>
+              <Check className='size-2.5' strokeWidth={3} />
+            </span>
+          </div>
+          <div className='grid min-w-0 flex-1 grid-cols-2 gap-1.5 font-mono text-[10px]'>
+            {['RBAC · CASBIN', 'JWT · PASSKEY', 'RATE QUOTA', 'AUDIT LOG'].map(
+              (chip) => (
+                <span
+                  key={chip}
+                  className='border-border/60 bg-card/80 text-muted-foreground truncate rounded-md border px-2 py-1 text-center'
+                >
+                  {chip}
+                </span>
+              )
+            )}
           </div>
         </div>
       ),
@@ -99,26 +137,33 @@ export function Features(_props: FeaturesProps) {
     {
       id: 'global',
       num: '03',
+      tag: 'SMART SCHEDULER',
       title: t('Global Coverage'),
       desc: t('Multi-region deployment for stable global access'),
-      span: 'md:col-span-1',
+      span: 'lg:col-span-5',
       icon: <Globe className='text-primary size-4' />,
       visual: (
-        <div className='mt-4 space-y-2'>
+        <div className='mt-6 space-y-2'>
           {[t('Load Balancing'), t('Rate Limiting'), t('Cost Tracking')].map(
             (step, i) => (
-              <div key={step} className='flex items-center gap-2'>
-                <div
-                  className={`flex size-6 items-center justify-center rounded-full text-[10px] font-bold ${
-                    i === 1
-                      ? 'border-primary/30 bg-primary/10 text-primary border'
-                      : 'border-border/40 bg-muted text-muted-foreground border'
-                  }`}
+              <div
+                key={step}
+                className='border-border/60 bg-background/60 flex items-center gap-3 rounded-xl border px-3 py-2'
+              >
+                <span
+                  className={cn(
+                    'flex size-5 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-bold tabular-nums',
+                    i === 0
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground'
+                  )}
                 >
-                  {i + 1}
-                </div>
-                <div className='bg-border/40 h-px flex-1' />
-                <span className='text-muted-foreground text-xs'>{step}</span>
+                  0{i + 1}
+                </span>
+                <span className='min-w-0 flex-1 truncate text-xs font-medium'>
+                  {step}
+                </span>
+                <span className='bg-success/80 size-1.5 shrink-0 rounded-full' />
               </div>
             )
           )}
@@ -128,25 +173,31 @@ export function Features(_props: FeaturesProps) {
     {
       id: 'developer',
       num: '04',
+      tag: 'DROP-IN SDK',
       title: t('Developer Friendly'),
       desc: t('Compatible API routes for common AI application workflows'),
-      span: 'md:col-span-1',
+      span: 'lg:col-span-7',
       icon: <Code className='text-primary size-4' />,
       visual: (
-        <div className='mt-4 flex items-center gap-3'>
-          <div className='flex -space-x-2'>
-            {['API', 'SDK', 'CLI', 'Docs'].map((n) => (
-              <div
-                key={n}
-                className='border-background from-muted to-muted/60 text-muted-foreground flex size-8 items-center justify-center rounded-full border-2 bg-gradient-to-br text-[9px] font-bold'
+        <div className='border-border/65 bg-background/65 mt-6 flex flex-col justify-between gap-3 rounded-xl border p-3.5 sm:flex-row sm:items-center'>
+          <div className='flex flex-wrap items-center gap-1.5'>
+            {['API', 'SDK', 'CLI', 'Docs'].map((surface, index) => (
+              <span
+                key={surface}
+                className={cn(
+                  'rounded-lg border px-2.5 py-1 font-mono text-xs font-semibold',
+                  index === 0
+                    ? 'border-primary/35 bg-primary/12 text-primary'
+                    : 'border-border/70 bg-card text-muted-foreground'
+                )}
               >
-                {n}
-              </div>
+                {surface}
+              </span>
             ))}
           </div>
-          <div className='text-muted-foreground flex items-center gap-1.5 text-xs'>
-            <Code className='text-primary size-3.5' />
-            {t('Multi-protocol Compatible')}
+          <div className='text-muted-foreground flex items-center gap-2 font-mono text-xs'>
+            <Code className='text-primary size-3.5 shrink-0' />
+            <span className='truncate'>{t('Multi-protocol Compatible')}</span>
           </div>
         </div>
       ),
@@ -155,81 +206,129 @@ export function Features(_props: FeaturesProps) {
 
   const additionalFeatures = [
     {
-      icon: <Gauge className='size-5' strokeWidth={1.5} />,
+      code: 'A1',
+      icon: <Gauge className='size-4' strokeWidth={1.75} />,
       title: t('High Performance'),
       desc: t('Support for high concurrency with automatic load balancing'),
     },
     {
-      icon: <DollarSign className='size-5' strokeWidth={1.5} />,
+      code: 'A2',
+      icon: <DollarSign className='size-4' strokeWidth={1.75} />,
       title: t('Transparent Billing'),
       desc: t('Pay-as-you-go with real-time usage monitoring'),
     },
     {
-      icon: <Users className='size-5' strokeWidth={1.5} />,
+      code: 'A3',
+      icon: <Users className='size-4' strokeWidth={1.75} />,
       title: t('Team Collaboration'),
       desc: t('Multi-user management with flexible permission allocation'),
     },
     {
-      icon: <HeartHandshake className='size-5' strokeWidth={1.5} />,
+      code: 'A4',
+      icon: <HeartHandshake className='size-4' strokeWidth={1.75} />,
       title: t('Open Source'),
       desc: t('Community driven, self-hosted, and extensible'),
     },
   ]
 
   return (
-    <section className='tokara-features relative z-10 px-6 py-16 md:py-20'>
-      <div className='mx-auto site-container'>
-        <AnimateInView className='mb-9 max-w-lg'>
-          <p className='text-primary mb-3 text-xs font-medium tracking-widest uppercase'>
-            {t('Core Features')}
-          </p>
-          <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-3xl'>
-            {t('Built for developers,')}
-            <br />
-            {t('designed for scale')}
-          </h2>
+    <section
+      className={cn(
+        'tokara-features relative z-10 px-5 py-16 sm:px-6 md:py-24',
+        props.className
+      )}
+    >
+      <div className='site-container mx-auto'>
+        <AnimateInView className='mb-10 flex flex-col gap-3 md:mb-12 md:flex-row md:items-end md:justify-between'>
+          <div className='max-w-xl'>
+            <p className='text-primary mb-2 font-mono text-[11px] font-semibold tracking-[0.22em] uppercase'>
+              // {t('Core Features')}
+            </p>
+            <h2 className='text-2xl leading-[1.15] font-bold tracking-[-0.025em] md:text-4xl'>
+              {t('Built for developers,')}{' '}
+              <span className='text-muted-foreground font-semibold'>
+                {t('designed for scale')}
+              </span>
+            </h2>
+          </div>
+          <div
+            aria-hidden='true'
+            className='text-muted-foreground/70 hidden font-mono text-xs tracking-widest uppercase md:block'
+          >
+            [ ARCH.SPEC · V2 ]
+          </div>
         </AnimateInView>
 
-        {/* Bento grid */}
-        <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
+        {/* Asymmetric 12-column Bento Grid with pointer-tracked spotlight */}
+        <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-12'>
           {features.map((f, i) => (
             <AnimateInView
               key={f.id}
-              delay={i * 100}
+              delay={i * 70}
               animation='scale-in'
-              className={`bg-card group hover:border-primary/40 rounded-lg border p-6 transition-colors duration-300 ${f.span}`}
+              className={cn('min-w-0', f.span)}
             >
-              <div className='mb-3 flex items-center gap-3'>
-                <span className='border-border/40 bg-muted text-muted-foreground flex size-7 items-center justify-center rounded-md border text-[10px] font-semibold tabular-nums'>
-                  {f.num}
-                </span>
-                <h3 className='text-sm font-semibold'>{f.title}</h3>
+              <div
+                onPointerMove={handleSpotlightMove}
+                className='tech-bento-card bg-card/85 border-border/80 group hover:border-primary/40 flex h-full flex-col justify-between rounded-2xl border p-5 shadow-2xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:p-6 dark:border-white/[0.08]'
+              >
+                <div className='relative z-10'>
+                  <div className='mb-3 flex items-center justify-between gap-3'>
+                    <div className='flex items-center gap-2.5'>
+                      <span className='border-primary/25 bg-primary/10 text-primary flex size-7 items-center justify-center rounded-lg border font-mono text-[11px] font-semibold tabular-nums'>
+                        {f.num}
+                      </span>
+                      <span
+                        aria-hidden='true'
+                        className='text-muted-foreground/70 font-mono text-[10px] tracking-[0.18em] uppercase'
+                      >
+                        {f.tag}
+                      </span>
+                    </div>
+                    <span className='border-border/60 bg-muted/40 group-hover:border-primary/30 flex size-8 items-center justify-center rounded-lg border transition-colors'>
+                      {f.icon}
+                    </span>
+                  </div>
+                  <h3 className='text-base font-semibold tracking-tight sm:text-lg'>
+                    {f.title}
+                  </h3>
+                  <p className='text-muted-foreground mt-1.5 max-w-xl text-sm leading-relaxed'>
+                    {f.desc}
+                  </p>
+                </div>
+                <div className='relative z-10'>{f.visual}</div>
               </div>
-              <p className='text-muted-foreground text-sm leading-relaxed'>
-                {f.desc}
-              </p>
-              {f.visual}
             </AnimateInView>
           ))}
         </div>
 
-        {/* Additional features row */}
-        <div className='mt-12 grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12'>
-          {additionalFeatures.map((f, i) => (
-            <AnimateInView
+        {/* Connected Architectural Spec Strip */}
+        <div className='border-border/75 bg-card/60 divide-border/65 mt-6 grid grid-cols-1 divide-y overflow-hidden rounded-2xl border backdrop-blur-sm sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4'>
+          {additionalFeatures.map((f) => (
+            <div
               key={f.title}
-              delay={i * 100}
-              animation='fade-up'
-              className='flex flex-col items-center text-center'
+              className='hover:bg-muted/35 flex items-start gap-3.5 p-5 transition-colors duration-200'
             >
-              <div className='text-muted-foreground border-border/50 bg-muted/30 group-hover:text-foreground mb-3 flex size-12 items-center justify-center rounded-xl border transition-colors'>
+              <div className='text-primary border-primary/20 bg-primary/10 flex size-9 shrink-0 items-center justify-center rounded-xl border'>
                 {f.icon}
               </div>
-              <h3 className='mb-1.5 text-sm font-semibold'>{f.title}</h3>
-              <p className='text-muted-foreground max-w-[200px] text-xs leading-relaxed'>
-                {f.desc}
-              </p>
-            </AnimateInView>
+              <div className='min-w-0'>
+                <div className='flex items-center gap-2'>
+                  <h3 className='truncate text-sm font-semibold tracking-tight'>
+                    {f.title}
+                  </h3>
+                  <span
+                    aria-hidden='true'
+                    className='text-muted-foreground/50 font-mono text-[10px]'
+                  >
+                    {f.code}
+                  </span>
+                </div>
+                <p className='text-muted-foreground mt-1 text-xs leading-relaxed'>
+                  {f.desc}
+                </p>
+              </div>
+            </div>
           ))}
         </div>
       </div>

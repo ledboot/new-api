@@ -16,8 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { motion, useReducedMotion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 
+import { MOTION_TRANSITION } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 
 import type { RankingPeriod } from '../types'
@@ -34,31 +36,34 @@ type RankingsHeroProps = {
   onPeriodChange: (period: RankingPeriod) => void
 }
 
-/**
- * Hero strip for the rankings page. Intentionally minimal — title +
- * subtitle + period tabs only.
- */
 export function RankingsHero(props: RankingsHeroProps) {
   const { t } = useTranslation()
+  const shouldReduceMotion = useReducedMotion()
 
   return (
-    <section className='space-y-5'>
+    <section className='border-border/65 flex flex-col justify-between gap-4 border-b pb-5 sm:pb-6 lg:flex-row lg:items-end'>
       <div className='space-y-2'>
-        <h1 className='text-[clamp(1.75rem,4vw,2.5rem)] leading-[1.15] font-bold tracking-tight'>
+        <p
+          aria-hidden='true'
+          className='text-primary font-mono text-[11px] font-semibold tracking-[0.2em] uppercase'
+        >
+          // LIVE TELEMETRY
+        </p>
+        <h1 className='text-[clamp(1.75rem,3.6vw,2.65rem)] leading-[1.12] font-bold tracking-[-0.03em]'>
           {t('Rankings')}
         </h1>
-        <p className='text-muted-foreground/80 max-w-2xl text-sm'>
+        <p className='text-muted-foreground max-w-2xl text-xs leading-relaxed sm:text-sm'>
           {t(
             'Discover the most-used models and rising vendors on the platform, updated from live usage data.'
           )}
         </p>
       </div>
 
-      {/* Underline tabs for period — clean and unobtrusive. */}
+      {/* Segmented glass pill period switcher */}
       <div
         role='tablist'
         aria-label={t('Period')}
-        className='border-border/60 flex items-center border-b'
+        className='border-border/75 bg-card/80 no-scrollbar inline-flex max-w-full items-center gap-0.5 self-start overflow-x-auto rounded-xl border p-1 shadow-2xs backdrop-blur-md lg:self-auto'
       >
         {PERIODS.map((p) => {
           const isActive = props.period === p.id
@@ -70,20 +75,23 @@ export function RankingsHero(props: RankingsHeroProps) {
               aria-selected={isActive}
               onClick={() => props.onPeriodChange(p.id)}
               className={cn(
-                'focus-visible:ring-ring/40 relative -mb-px rounded-sm px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
+                'focus-visible:ring-ring/40 relative shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
                 isActive
-                  ? 'text-foreground'
+                  ? 'text-primary-foreground font-semibold'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {t(p.labelKey)}
-              <span
-                aria-hidden
-                className={cn(
-                  'bg-foreground absolute inset-x-3 -bottom-px h-[2px] rounded-full transition-opacity',
-                  isActive ? 'opacity-100' : 'opacity-0'
-                )}
-              />
+              {isActive && (
+                <motion.span
+                  layoutId={
+                    shouldReduceMotion ? undefined : 'rankings-period-pill'
+                  }
+                  transition={MOTION_TRANSITION.spring}
+                  aria-hidden='true'
+                  className='bg-primary absolute inset-0 rounded-lg shadow-xs'
+                />
+              )}
+              <span className='relative z-10'>{t(p.labelKey)}</span>
             </button>
           )
         })}

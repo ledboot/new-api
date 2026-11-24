@@ -50,8 +50,8 @@ export function SearchBar(props: SearchBarProps) {
   }, [])
 
   return (
-    <div className={cn('relative', props.className)}>
-      <Search className='text-muted-foreground/60 pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2' />
+    <div className={cn('group/search relative', props.className)}>
+      <Search className='text-muted-foreground group-focus-within/search:text-primary pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 transition-colors' />
       <input
         ref={inputRef}
         type='text'
@@ -59,10 +59,10 @@ export function SearchBar(props: SearchBarProps) {
         value={props.value}
         onChange={(e) => props.onChange(e.target.value)}
         className={cn(
-          'border-border/60 bg-background placeholder:text-muted-foreground/50',
-          'hover:border-border',
-          'focus:border-primary/50 focus:ring-primary/20 focus:ring-2',
-          'h-10 w-full rounded-lg border pr-16 pl-10 text-sm transition-all outline-none'
+          'border-border/80 bg-card/85 placeholder:text-muted-foreground/55 shadow-2xs backdrop-blur-md',
+          'hover:border-primary/35',
+          'focus:border-primary/55 focus:ring-primary/20 focus:ring-3',
+          'h-11 w-full rounded-xl border pr-16 pl-10 text-sm transition-all outline-none'
         )}
         aria-label={t('Search models')}
       />
@@ -72,13 +72,13 @@ export function SearchBar(props: SearchBarProps) {
             variant='ghost'
             size='icon'
             onClick={props.onClear}
-            className='text-muted-foreground/60 hover:text-foreground size-7'
+            className='text-muted-foreground/60 hover:text-foreground size-7 rounded-lg'
             aria-label={t('Clear search')}
           >
             <X className='size-4' />
           </Button>
         ) : (
-          <kbd className='bg-muted text-muted-foreground pointer-events-none hidden rounded border px-1.5 py-0.5 font-mono text-[10px] sm:inline-block'>
+          <kbd className='border-border/75 bg-muted/70 text-muted-foreground pointer-events-none hidden rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-medium sm:inline-block'>
             ⌘K
           </kbd>
         )}

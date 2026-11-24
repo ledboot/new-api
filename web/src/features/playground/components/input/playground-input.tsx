@@ -93,10 +93,10 @@ export function PlaygroundInput({
   }
 
   return (
-    <div className='grid shrink-0 gap-4 px-1 md:pb-4'>
+    <div className='grid shrink-0 gap-4 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 md:pb-4'>
       <PromptInput
-        className='relative'
-        groupClassName='bg-background/95 dark:bg-background/80 border-border/70 shadow-[0_18px_60px_-32px_rgba(0,0,0,0.65)] ring-1 ring-foreground/5 rounded-xl overflow-hidden transition-all duration-200 focus-within:border-primary/45 focus-within:ring-primary/15 focus-within:shadow-[0_22px_70px_-34px_rgba(0,0,0,0.75)]'
+        className='relative mx-auto w-full max-w-4xl'
+        groupClassName='bg-card/95 dark:bg-card/90 border-border/80 before:from-transparent before:via-primary/50 relative overflow-hidden rounded-2xl shadow-[0_18px_50px_-28px_rgb(15_23_42/0.18)] ring-1 ring-foreground/5 transition-all duration-200 before:pointer-events-none before:absolute before:inset-x-8 before:top-0 before:h-px before:bg-linear-to-r before:to-transparent focus-within:border-primary/55 focus-within:ring-primary/25 focus-within:shadow-[0_20px_60px_-26px_color-mix(in_oklch,var(--primary)_32%,transparent)] dark:shadow-[0_20px_60px_-30px_rgb(0_0_0/0.78)]'
         onSubmit={handleSubmit}
       >
         <PromptInputTextarea

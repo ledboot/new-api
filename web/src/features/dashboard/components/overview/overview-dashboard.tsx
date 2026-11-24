@@ -251,16 +251,16 @@ function StartStepItem(props: {
 
       <Link
         to={props.step.to}
-        className='bg-background/70 hover:bg-muted/50 focus-visible:ring-ring flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left shadow-xs transition-colors outline-none focus-visible:ring-2'
+        className='group/step border-border/75 bg-background/80 hover:border-primary/40 hover:bg-card focus-visible:ring-ring flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left shadow-2xs transition-all outline-none focus-visible:ring-2'
       >
         <span className='flex min-w-0 items-start gap-2.5'>
-          <span className='bg-muted mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg'>
+          <span className='bg-primary/10 text-primary mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg'>
             <Icon className='size-3.5' aria-hidden='true' />
           </span>
           <span className='flex min-w-0 flex-col gap-0.5'>
             <span className='flex items-center gap-2 text-sm font-medium'>
-              <span className='text-muted-foreground font-mono text-xs tabular-nums'>
-                {props.index + 1}.
+              <span className='text-primary font-mono text-xs font-semibold tabular-nums'>
+                0{props.index + 1}
               </span>
               <span className='truncate'>{props.step.title}</span>
             </span>
@@ -270,7 +270,7 @@ function StartStepItem(props: {
           </span>
         </span>
         <ArrowRight
-          className='text-muted-foreground size-4 shrink-0'
+          className='text-muted-foreground group-hover/step:text-primary size-4 shrink-0 transition-transform duration-200 group-hover/step:translate-x-0.5'
           aria-hidden='true'
         />
       </Link>
@@ -373,17 +373,25 @@ function RequestPreview(props: {
         )}
       </div>
 
-      <div className='bg-foreground/[0.035] my-3 rounded-xl p-3 font-mono text-xs'>
-        <div className='mb-2 flex items-center gap-1.5'>
-          <span className='bg-destructive size-2 rounded-full' />
-          <span className='bg-warning size-2 rounded-full' />
-          <span className='bg-success size-2 rounded-full' />
+      <div className='my-3 rounded-xl border border-white/10 bg-[#070b14] p-3.5 font-mono text-xs text-slate-300 shadow-inner'>
+        <div className='mb-2.5 flex items-center justify-between border-b border-white/[0.07] pb-2'>
+          <div className='flex items-center gap-1.5'>
+            <span className='size-2 rounded-full bg-rose-400/85' />
+            <span className='size-2 rounded-full bg-amber-400/85' />
+            <span className='size-2 rounded-full bg-emerald-400/85' />
+          </div>
+          <span
+            aria-hidden='true'
+            className='text-[10px] tracking-widest text-sky-400/80 uppercase'
+          >
+            POST · /V1
+          </span>
         </div>
         <div className='flex flex-col gap-1 overflow-hidden'>
           {previewLines.map((line) => (
             <code
               key={line}
-              className='text-muted-foreground truncate'
+              className='truncate text-slate-300/90'
               title={line}
             >
               {line}
@@ -392,14 +400,14 @@ function RequestPreview(props: {
         </div>
       </div>
 
-      <div className='grid gap-2'>
+      <div className='grid gap-1.5'>
         {props.signals.map((signal) => {
           const Icon = signal.icon
 
           return (
             <div
               key={signal.label}
-              className='bg-muted/40 flex items-center justify-between gap-3 rounded-xl px-3 py-2'
+              className='border-border/60 bg-muted/45 flex items-center justify-between gap-3 rounded-xl border px-3 py-2'
             >
               <span className='flex min-w-0 items-center gap-2'>
                 <IconBadge tone={signal.tone} size='xs'>
@@ -409,7 +417,7 @@ function RequestPreview(props: {
                   {signal.label}
                 </span>
               </span>
-              <span className='text-muted-foreground shrink-0 text-xs'>
+              <span className='text-muted-foreground shrink-0 font-mono text-[11px]'>
                 {signal.value}
               </span>
             </div>
@@ -426,20 +434,24 @@ function QuickActionItem(props: { action: QuickAction }) {
   return (
     <Button
       variant='outline'
-      className='h-auto justify-start rounded-xl px-3 py-3 text-left'
+      className='group/qa hover:border-primary/40 h-auto justify-start rounded-xl px-3.5 py-3 text-left transition-all'
       render={<Link to={props.action.to} />}
     >
-      <span className='bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg'>
+      <span className='bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-xl'>
         <Icon className='size-4' aria-hidden='true' />
       </span>
       <span className='flex min-w-0 flex-1 flex-col gap-0.5'>
-        <span className='truncate text-sm font-medium'>
+        <span className='truncate text-sm font-semibold tracking-tight'>
           {props.action.title}
         </span>
         <span className='text-muted-foreground line-clamp-2 text-xs leading-relaxed'>
           {props.action.description}
         </span>
       </span>
+      <ArrowRight
+        className='text-muted-foreground/60 group-hover/qa:text-primary size-4 shrink-0 transition-transform duration-200 group-hover/qa:translate-x-0.5'
+        aria-hidden='true'
+      />
     </Button>
   )
 }

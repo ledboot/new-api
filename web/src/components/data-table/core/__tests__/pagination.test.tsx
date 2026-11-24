@@ -65,3 +65,12 @@ it('keeps page size selection available in the default layout', () => {
   render(<Fixture />)
   expect(screen.getByRole('combobox')).toBeVisible()
 })
+
+it('renders responsive mobile page indicator alongside page buttons in default mode', async () => {
+  const user = userEvent.setup()
+  render(<Fixture />)
+
+  expect(screen.getByText('1 / 2')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /Go to page 2/i }))
+  expect(screen.getByText('2 / 2')).toBeInTheDocument()
+})

@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { cn } from '@/lib/utils'
+
 interface CounterProps {
   end: number
   suffix?: string
@@ -28,7 +30,7 @@ interface CounterProps {
 }
 
 function Counter(props: CounterProps) {
-  const { end, suffix = '', prefix = '', duration = 1600, decimals = 0 } = props
+  const { end, suffix = '', prefix = '', duration = 1200, decimals = 0 } = props
   const ref = useRef<HTMLSpanElement>(null)
   const startedRef = useRef(false)
 
@@ -40,7 +42,8 @@ function Counter(props: CounterProps) {
 
   const animate = useCallback(() => {
     const el = ref.current
-    if (!el) return
+    if (!el || startedRef.current) return
+    startedRef.current = true
     const start = performance.now()
     const step = (now: number) => {
       const progress = Math.min((now - start) / duration, 1)
@@ -56,20 +59,19 @@ function Counter(props: CounterProps) {
     if (!el) return
 
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    if (mq.matches) {
+    if (mq.matches || typeof IntersectionObserver === 'undefined') {
       el.textContent = `${prefix}${formatValue(end)}${suffix}`
       return
     }
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !startedRef.current) {
-          startedRef.current = true
+        if (entry.isIntersecting) {
           animate()
           observer.unobserve(el)
         }
       },
-      { threshold: 0.5 }
+      { threshold: 0.05 }
     )
 
     observer.observe(el)
@@ -78,7 +80,9 @@ function Counter(props: CounterProps) {
 
   return (
     <span ref={ref} className='tabular-nums'>
-      {prefix}0{suffix}
+      {prefix}
+      {formatValue(end)}
+      {suffix}
     </span>
   )
 }
@@ -88,39 +92,88 @@ interface StatsProps {
 }
 
 interface StatItem {
+  code: string
   end: number
   suffix: string
   label: string
+  accentClass: string
   decimals?: number
 }
 
-export function Stats(_props: StatsProps) {
+export function Stats(props: StatsProps) {
   const { t } = useTranslation()
 
   const stats: StatItem[] = [
-    { end: 50, suffix: '+', label: t('upstream services integrated') },
-    { end: 100, suffix: '+', label: t('model billing support') },
-    { end: 50, suffix: '+', label: t('compatible API routes') },
-    { end: 10, suffix: '+', label: t('scheduling controls') },
+    {
+      code: '01 // PROVIDERS',
+      end: 50,
+      suffix: '+',
+      label: t('upstream services integrated'),
+      accentClass: 'bg-primary',
+    },
+    {
+      code: '02 // BILLING',
+      end: 100,
+      suffix: '+',
+      label: t('model billing support'),
+      accentClass: 'bg-chart-2',
+    },
+    {
+      code: '03 // PROTOCOLS',
+      end: 50,
+      suffix: '+',
+      label: t('compatible API routes'),
+      accentClass: 'bg-chart-3',
+    },
+    {
+      code: '04 // ROUTING',
+      end: 10,
+      suffix: '+',
+      label: t('scheduling controls'),
+      accentClass: 'bg-chart-4',
+    },
   ]
 
   return (
-    <div className='border-border/40 bg-muted/10 relative z-10 border-y'>
-      <div className='mx-auto site-container px-6 py-10 md:py-12'>
-        <div className='grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12'>
-          {stats.map((s) => (
-            <div
-              key={s.label}
-              className='flex flex-col items-center text-center'
-            >
-              <span className='text-2xl font-bold tracking-tight md:text-3xl'>
-                <Counter end={s.end} suffix={s.suffix} decimals={s.decimals} />
-              </span>
-              <span className='text-muted-foreground mt-1.5 text-xs'>
-                {s.label}
-              </span>
-            </div>
-          ))}
+    <div className={cn('relative z-10 px-5 sm:px-6', props.className)}>
+      <div className='site-container mx-auto'>
+        <div className='tech-corner-ticks rounded-2xl'>
+          <div className='border-border/75 bg-card/75 divide-border/65 grid grid-cols-2 divide-x divide-y overflow-hidden rounded-2xl border shadow-2xs backdrop-blur-md md:grid-cols-4 md:divide-y-0'>
+            {stats.map((s) => (
+              <div
+                key={s.code}
+                className='group hover:bg-muted/35 relative flex flex-col justify-between gap-3 p-4 transition-colors duration-200 sm:p-6'
+              >
+                <div className='flex items-center justify-between gap-2'>
+                  <span
+                    aria-hidden='true'
+                    className='text-muted-foreground/70 font-mono text-[10px] tracking-[0.16em] uppercase'
+                  >
+                    {s.code}
+                  </span>
+                  <span
+                    aria-hidden='true'
+                    className={cn(
+                      'size-1.5 rounded-full opacity-80 transition-transform duration-200 group-hover:scale-125',
+                      s.accentClass
+                    )}
+                  />
+                </div>
+                <div>
+                  <div className='font-mono text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl'>
+                    <Counter
+                      end={s.end}
+                      suffix={s.suffix}
+                      decimals={s.decimals}
+                    />
+                  </div>
+                  <p className='text-muted-foreground mt-1 text-xs leading-snug font-medium'>
+                    {s.label}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

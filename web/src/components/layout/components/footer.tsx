@@ -116,7 +116,7 @@ function LegalLinks(props: {
     </Fragment>
   ))
   if (!props.wrapperClassName) {
-    return <>{links}</>
+    return links
   }
   return <div className={props.wrapperClassName}>{links}</div>
 }
@@ -198,15 +198,13 @@ export function Footer(props: FooterProps) {
           props.className
         )}
       >
-        <div className='mx-auto w-full site-container px-6 py-5'>
+        <div className='site-container mx-auto w-full px-6 py-5'>
           <div className='bg-muted/20 border-border/50 flex flex-col items-center justify-between gap-4 rounded-2xl border px-4 py-4 backdrop-blur-sm sm:flex-row sm:px-5'>
             <div
               className='custom-footer text-muted-foreground min-w-0 text-center text-sm sm:text-left'
               dangerouslySetInnerHTML={{ __html: footerHtml }}
             />
-            <LegalLinks
-              wrapperClassName='border-border/60 text-muted-foreground/45 flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t pt-4 text-xs sm:w-auto sm:justify-end sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5'
-            />
+            <LegalLinks wrapperClassName='border-border/60 text-muted-foreground/45 flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t pt-4 text-xs sm:w-auto sm:justify-end sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5' />
           </div>
         </div>
       </footer>
@@ -217,7 +215,7 @@ export function Footer(props: FooterProps) {
     <footer
       className={cn('border-border/40 relative z-10 border-t', props.className)}
     >
-      <div className='mx-auto site-container px-6 py-12 md:py-16'>
+      <div className='site-container mx-auto px-6 py-12 md:py-16'>
         <div className='flex flex-col justify-between gap-10 md:flex-row md:gap-16'>
           {/* Brand column */}
           <div className='shrink-0'>
@@ -238,7 +236,7 @@ export function Footer(props: FooterProps) {
 
           {/* Links columns */}
           {isDemoSiteMode && (
-            <div className='grid grid-cols-3 gap-8 md:gap-16'>
+            <div className='grid grid-cols-2 gap-8 sm:grid-cols-3 md:gap-16'>
               {displayColumns.map((column) => (
                 <div key={column.title}>
                   <p className='text-muted-foreground/50 mb-3 text-xs font-medium tracking-wider uppercase'>

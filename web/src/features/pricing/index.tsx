@@ -151,7 +151,7 @@ export function Pricing() {
   if (isLoading) {
     return (
       <PublicLayout showMainContainer={false}>
-        <div className='mx-auto w-full site-container px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
+        <div className='site-container mx-auto w-full px-3 pt-20 pb-8 sm:px-6 sm:pt-24 sm:pb-10 xl:px-8'>
           <LoadingSkeleton viewMode={viewMode} />
         </div>
       </PublicLayout>
@@ -163,34 +163,35 @@ export function Pricing() {
       <div className='relative'>
         <div
           aria-hidden
-          className='pointer-events-none absolute inset-x-0 top-0 h-[600px] opacity-20 dark:opacity-[0.10]'
-          style={{
-            background: [
-              'radial-gradient(ellipse 60% 50% at 20% 20%, oklch(0.72 0.18 250 / 80%) 0%, transparent 70%)',
-              'radial-gradient(ellipse 50% 40% at 80% 15%, oklch(0.65 0.15 200 / 60%) 0%, transparent 70%)',
-              'radial-gradient(ellipse 40% 35% at 50% 70%, oklch(0.70 0.12 280 / 40%) 0%, transparent 70%)',
-            ].join(', '),
-            maskImage:
-              'linear-gradient(to bottom, black 40%, transparent 100%)',
-            WebkitMaskImage:
-              'linear-gradient(to bottom, black 40%, transparent 100%)',
-          }}
+          className='tech-aurora-top pointer-events-none absolute inset-x-0 top-0 h-[440px]'
         />
-        <PageTransition className='relative mx-auto w-full site-container px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
-          <header className='mx-auto mb-5 max-w-3xl pt-5 text-center sm:mb-10 sm:pt-10'>
-            <h1 className='text-[clamp(2rem,5.5vw,3.5rem)] leading-[1.15] font-bold tracking-tight'>
-              {t('Model Square')}
-            </h1>
-            <p className='text-muted-foreground/80 mt-3 text-sm sm:mt-4 sm:text-base'>
-              {t('This site currently has {{count}} models enabled', {
-                count: models?.length || 0,
-              })}
-            </p>
-            <p className='text-muted-foreground/60 mx-auto mt-2 max-w-2xl text-xs leading-relaxed sm:text-sm'>
-              {t(
-                'Discover curated AI models, compare pricing and capabilities, and choose the right model for every scenario.'
-              )}
-            </p>
+        <div
+          aria-hidden
+          className='tokara-hero-grid pointer-events-none absolute inset-x-0 top-0 h-[340px]'
+        />
+        <PageTransition className='site-container relative mx-auto w-full px-3 pt-20 pb-8 sm:px-6 sm:pt-24 sm:pb-12 xl:px-8'>
+          {/* Split Registry Command Header */}
+          <header className='border-border/65 mb-5 flex flex-col justify-between gap-4 border-b pb-5 sm:mb-6 sm:pb-6 lg:flex-row lg:items-end'>
+            <div className='min-w-0 space-y-2'>
+              <div className='border-primary/25 bg-primary/8 text-primary inline-flex items-center gap-2 rounded-full border px-3 py-1 font-mono text-xs font-medium'>
+                <span
+                  aria-hidden='true'
+                  className='bg-success size-1.5 rounded-full shadow-[0_0_6px_var(--success)]'
+                />
+                {t('This site currently has {{count}} models enabled', {
+                  count: models?.length || 0,
+                })}
+              </div>
+              <h1 className='text-[clamp(1.75rem,3.6vw,2.65rem)] leading-[1.12] font-bold tracking-[-0.03em]'>
+                {t('Model Square')}
+              </h1>
+              <p className='text-muted-foreground max-w-2xl text-xs leading-relaxed sm:text-sm'>
+                {t(
+                  'Discover curated AI models, compare pricing and capabilities, and choose the right model for every scenario.'
+                )}
+              </p>
+            </div>
+
             <SearchBar
               value={searchInput}
               onChange={setSearchInput}
@@ -198,11 +199,11 @@ export function Pricing() {
               placeholder={t(
                 'Search model name, provider, endpoint, or tag...'
               )}
-              className='mx-auto mt-4 max-w-2xl sm:mt-6'
+              className='w-full shrink-0 lg:w-[400px] xl:w-[440px]'
             />
           </header>
 
-          <div className='grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]'>
+          <div className='grid gap-4 xl:grid-cols-[268px_minmax(0,1fr)]'>
             <PricingSidebar
               quotaTypeFilter={quotaTypeFilter}
               endpointTypeFilter={endpointTypeFilter}

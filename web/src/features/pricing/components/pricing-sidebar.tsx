@@ -96,7 +96,11 @@ function FilterChip(props: {
       size='sm'
       onClick={props.onClick}
       aria-pressed={props.active}
-      className='h-auto max-w-full gap-1.5 px-2 py-1 text-xs'
+      className={cn(
+        'h-auto max-w-full gap-1.5 rounded-lg px-2.5 py-1 text-xs transition-all',
+        props.active &&
+          'border-primary/40 bg-primary/12 text-foreground hover:bg-primary/16 border font-medium'
+      )}
       title={props.option.label}
     >
       {props.option.icon && (
@@ -106,9 +110,9 @@ function FilterChip(props: {
       {(props.option.suffix || props.option.count != null) && (
         <span
           className={cn(
-            'rounded-md px-1.5 py-0.5 text-[12px]',
+            'rounded-md px-1.5 py-0.5 font-mono text-[10px] tabular-nums',
             props.active
-              ? 'bg-background text-foreground'
+              ? 'bg-primary/15 text-primary font-semibold'
               : 'bg-muted text-muted-foreground'
           )}
         >
@@ -259,7 +263,12 @@ export const PricingSidebar = memo(function PricingSidebar(
   ]
 
   return (
-    <aside className={cn('bg-card rounded-xl border p-3', props.className)}>
+    <aside
+      className={cn(
+        'border-border/80 bg-card/85 rounded-2xl border p-3.5 shadow-2xs backdrop-blur-md dark:border-white/[0.08]',
+        props.className
+      )}
+    >
       <div className='mb-2.5 flex items-center justify-between gap-2'>
         <div>
           <h2 className='text-foreground text-sm font-bold'>{t('Filter')}</h2>
