@@ -25,6 +25,7 @@ func TestDocumentRendersPageMetadata(t *testing.T) {
 	assert.Contains(t, home, `"@type":"Organization"`)
 	assert.Contains(t, home, `"@type":"WebSite"`)
 	assert.Contains(t, home, `"@type":"SoftwareApplication"`)
+	assert.Contains(t, home, `"@type":"FAQPage"`)
 	assert.Contains(t, home, `<script type="application/json" id="site-seo-data">`)
 	assert.NotContains(t, home, "<title>fallback</title>")
 
@@ -34,6 +35,22 @@ func TestDocumentRendersPageMetadata(t *testing.T) {
 	assert.Contains(t, english, `<link rel="canonical" href="https://tokara.top/pricing" />`)
 	assert.Contains(t, english, `"@type":"BreadcrumbList"`)
 	assert.NotContains(t, english, `"@type":"SoftwareApplication"`)
+
+	claudeZh := string(Document([]byte(testIndexPage), "/claude-code", "https://tokara.top", "zh-CN"))
+	assert.Contains(t, claudeZh, "<title>Claude Code 与 Claude 5.5 / Fable 5.2 API 接入指南｜Tokara</title>")
+	assert.Contains(t, claudeZh, `<link rel="canonical" href="https://tokara.top/claude-code" />`)
+	assert.Contains(t, claudeZh, `"@type":"FAQPage"`)
+	assert.Contains(t, claudeZh, `"name":"Claude Code"`)
+
+	gptEn := string(Document([]byte(testIndexPage), "/gpt", "https://tokara.top", "en"))
+	assert.Contains(t, gptEn, "<title>OpenAI GPT-6.2, GPT-6.1 &amp; Codex CLI API Guide — Tokara</title>")
+	assert.Contains(t, gptEn, `<link rel="canonical" href="https://tokara.top/gpt" />`)
+	assert.Contains(t, gptEn, `"@type":"FAQPage"`)
+
+	geminiEn := string(Document([]byte(testIndexPage), "/gemini", "https://tokara.top", "en"))
+	assert.Contains(t, geminiEn, "<title>Google Gemini 4 (Carbon, Argon, Hydrogen) &amp; 3.8 Flash API Guide — Tokara</title>")
+	assert.Contains(t, geminiEn, `<link rel="canonical" href="https://tokara.top/gemini" />`)
+	assert.Contains(t, geminiEn, `"@type":"FAQPage"`)
 }
 
 func TestDocumentIncludesSearchConsoleVerification(t *testing.T) {
@@ -102,12 +119,18 @@ func TestFeeds(t *testing.T) {
 
 	sitemap := Sitemap("https://tokara.top", []string{"/pricing/claude-sonnet-4", "/pricing", "/"})
 	assert.Contains(t, sitemap, "<loc>https://tokara.top/pricing</loc>")
+	assert.Contains(t, sitemap, "<loc>https://tokara.top/claude-code</loc>")
+	assert.Contains(t, sitemap, "<loc>https://tokara.top/gpt</loc>")
+	assert.Contains(t, sitemap, "<loc>https://tokara.top/gemini</loc>")
 	assert.Contains(t, sitemap, "<loc>https://tokara.top/pricing/claude-sonnet-4</loc>")
 	assert.Equal(t, 1, strings.Count(sitemap, "<loc>https://tokara.top/</loc>"))
 
 	llms := LLMsTxt("https://tokara.top")
 	assert.True(t, strings.HasPrefix(llms, "# Tokara"))
 	assert.Contains(t, llms, "(https://tokara.top/docs)")
+	assert.Contains(t, llms, "(https://tokara.top/claude-code)")
+	assert.Contains(t, llms, "(https://tokara.top/gpt)")
+	assert.Contains(t, llms, "(https://tokara.top/gemini)")
 }
 
 func TestOriginPrefersConfiguredServerAddress(t *testing.T) {

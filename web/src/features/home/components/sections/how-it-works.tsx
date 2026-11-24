@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Link } from '@tanstack/react-router'
 import { Settings, Zap, BarChart3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -42,6 +43,11 @@ export function HowItWorks() {
         'Connect through OpenAI, Claude, Gemini, and other compatible API routes'
       ),
       icon: <Zap className='size-6' strokeWidth={1.5} />,
+      links: [
+        { label: 'Claude Code', href: '/claude-code' as const },
+        { label: 'GPT-6.2 & Codex', href: '/gpt' as const },
+        { label: 'Gemini 4', href: '/gemini' as const },
+      ],
     },
     {
       num: '3',
@@ -57,7 +63,7 @@ export function HowItWorks() {
         <div>
           <AnimateInView className='mb-9'>
             <p className='text-primary mb-2.5 font-mono text-[11px] font-semibold tracking-[0.2em] uppercase'>
-              {t('How It Works')}
+              // {t('How It Works')}
             </p>
             <h2 className='text-2xl font-bold tracking-tight md:text-3xl'>
               {t('Three steps to get started')}
@@ -93,6 +99,19 @@ export function HowItWorks() {
                   <p className='text-muted-foreground max-w-md text-sm leading-relaxed'>
                     {step.desc}
                   </p>
+                  {step.links && (
+                    <div className='mt-2.5 flex flex-wrap gap-1.5'>
+                      {step.links.map((item) => (
+                        <Link
+                          key={item.href}
+                          to={item.href}
+                          className='border-border/75 bg-card/85 hover:border-primary/40 hover:text-primary rounded-md border px-2 py-0.5 font-mono text-[11px] font-medium transition-colors'
+                        >
+                          {item.label} →
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </AnimateInView>
             ))}

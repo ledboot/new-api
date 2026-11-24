@@ -20,10 +20,17 @@ type copywriting struct {
 	description string
 }
 
+type faqItem struct {
+	question string
+	answer   string
+}
+
 type pageMeta struct {
-	zh    copywriting
-	en    copywriting
-	trail []crumb
+	zh     copywriting
+	en     copywriting
+	trail  []crumb
+	zhFAQs []faqItem
+	enFAQs []faqItem
 }
 
 // crumb is one step of the breadcrumb trail below the home page.
@@ -41,13 +48,166 @@ var staticPages = map[string]pageMeta{
 	"/": {
 		zh: copywriting{
 			title:       "Tokara — 一站式 AI API 平台｜统一接入 OpenAI、Claude、Gemini",
-			description: "Tokara 是面向开发者与创作者的一站式 AI 大模型 API 平台：一个密钥即可调用 OpenAI、Claude、Gemini、DeepSeek 等主流模型，兼容 OpenAI 接口，按量计费并提供实时用量统计。",
+			description: "Tokara 是面向开发者与创作者的一站式 AI 大模型 API 平台：一个密钥即可接入 Claude Code（Claude 5.5 / Fable 5.2）、OpenAI GPT-6.2 / 6.1 与 Codex、Google Gemini 4 与 DeepSeek V4 等最新主流模型，原生支持多协议路由与按量计费。",
 		},
 		en: copywriting{
 			title:       "Tokara — One AI API for OpenAI, Claude, Gemini and DeepSeek",
-			description: "Tokara is an AI API platform for developers and creators: call OpenAI, Claude, Gemini and DeepSeek models with a single key over an OpenAI-compatible API, with pay-as-you-go billing and real-time usage analytics.",
+			description: "Tokara is an AI API gateway for developers and creators: connect Claude Code (Claude 5.5 & Fable 5.2), OpenAI GPT-6.2 / 6.1 & Codex, Google Gemini 4 and DeepSeek V4 with one key across OpenAI, Anthropic and Gemini endpoints with pay-as-you-go billing.",
 		},
 		trail: nil,
+		zhFAQs: []faqItem{
+			{
+				question: "Tokara 可以调用哪些最新主流 AI 模型与编程工具？",
+				answer:   "一个 Tokara API 密钥即可调用 Anthropic Claude 5.5 / Fable 5.2（原生适配 Claude Code CLI）、OpenAI GPT-6.2 / GPT-6.1（原生适配 Codex CLI Responses 接口）、Google Gemini 4（Carbon / Argon / Hydrogen）与 Gemini 3.8 Flash，以及 DeepSeek V4.1 / V4 Pro 等最新主流模型。",
+			},
+			{
+				question: "Claude Code 如何接入 Tokara？",
+				answer:   "Claude Code 使用 Anthropic Messages 协议（/v1/messages），只需将环境变量 ANTHROPIC_BASE_URL 设为站点根地址（不带 /v1），并将 ANTHROPIC_AUTH_TOKEN 设为 Tokara 的 sk- 令牌即可直接使用。",
+			},
+			{
+				question: "Tokara 是否兼容 OpenAI SDK 与 Responses 接口？",
+				answer:   "完全兼容。支持 POST /v1/chat/completions、POST /v1/responses、POST /v1/messages 与 POST /v1beta/models 等原生入口，现有 SDK 与客户端无需改代码即可迁移。",
+			},
+			{
+				question: "Tokara 如何计费？",
+				answer:   "按实际消耗的输入、输出与缓存命中 token 精细计费，每次调用的模型、分组倍率、耗时和费用都会实时记录在控制台日志中。",
+			},
+		},
+		enFAQs: []faqItem{
+			{
+				question: "Which latest AI models and coding tools work with Tokara?",
+				answer:   "A single Tokara API key connects Anthropic Claude 5.5 and Fable 5.2 (native Claude Code CLI support), OpenAI GPT-6.2 and GPT-6.1 (native Codex CLI Responses API), Google Gemini 4 (Carbon, Argon, Hydrogen) and Gemini 3.8 Flash, DeepSeek V4.1 and more.",
+			},
+			{
+				question: "How do I connect Claude Code to Tokara?",
+				answer:   "Set ANTHROPIC_BASE_URL to the Tokara root origin (without /v1, since Claude Code appends /v1/messages automatically) and set ANTHROPIC_AUTH_TOKEN to your sk- API key.",
+			},
+			{
+				question: "Is Tokara compatible with the OpenAI SDK and Responses API?",
+				answer:   "Yes. Tokara natively serves POST /v1/chat/completions, POST /v1/responses, POST /v1/messages and POST /v1beta/models so existing SDKs and CLI agents work without code changes.",
+			},
+			{
+				question: "How is usage billed on Tokara?",
+				answer:   "Usage is billed per token with separate input, output and prompt-cache rates. Every request logs token counts, latency and exact cost in real time.",
+			},
+		},
+	},
+	"/claude-code": {
+		zh: copywriting{
+			title:       "Claude Code 与 Claude 5.5 / Fable 5.2 API 接入指南｜Tokara",
+			description: "通过 Tokara 原生 Anthropic Messages 接口（/v1/messages）接入 Claude Code CLI 与最新 Claude Fable 5.2、Opus 5.5、Sonnet 5.5、Haiku 5.5，支持百万上下文、提示词缓存与按量计费。",
+		},
+		en: copywriting{
+			title:       "Claude Code & Claude 5.5 / Fable 5.2 API Guide — Tokara",
+			description: "Connect Claude Code CLI and Claude Fable 5.2, Opus 5.5, Sonnet 5.5 and Haiku 5.5 through Tokara's native Anthropic Messages API (/v1/messages) with 1M context, prompt caching and per-token billing.",
+		},
+		trail: []crumb{{name: "Claude Code", path: "/claude-code"}},
+		zhFAQs: []faqItem{
+			{
+				question: "为什么 Claude Code 配置 ANTHROPIC_BASE_URL 后返回 404？",
+				answer:   "Anthropic SDK 与 Claude Code 会自动在地址后拼接 /v1/messages，因此 ANTHROPIC_BASE_URL 必须填写站点根域名（如 https://tokara.top），不要在末尾加 /v1。",
+			},
+			{
+				question: "Claude Code 推荐搭配哪些最新 Claude 模型？",
+				answer:   "复杂多文件重构与深度架构推理推荐 claude-fable-5-2 或 claude-opus-5-5，高频日常编码推荐 claude-sonnet-5-5，小模型后台任务（ANTHROPIC_SMALL_FAST_MODEL）推荐 claude-haiku-5-5。",
+			},
+			{
+				question: "Tokara 支持 Claude Code 的 Prompt Caching（提示词缓存）吗？",
+				answer:   "支持。原生 /v1/messages 通道保留缓存写入与命中计费字段，长代码库多轮对话命中缓存时可大幅降低输入 token 成本。",
+			},
+		},
+		enFAQs: []faqItem{
+			{
+				question: "Why does Claude Code return 404 after setting ANTHROPIC_BASE_URL?",
+				answer:   "Claude Code automatically appends /v1/messages to ANTHROPIC_BASE_URL. Set ANTHROPIC_BASE_URL to the root origin (for example https://tokara.top) without a trailing /v1.",
+			},
+			{
+				question: "Which latest Claude models are recommended for Claude Code?",
+				answer:   "Use claude-fable-5-2 or claude-opus-5-5 for complex multi-file architecture work, claude-sonnet-5-5 for fast everyday coding, and claude-haiku-5-5 for ANTHROPIC_SMALL_FAST_MODEL background tasks.",
+			},
+			{
+				question: "Does Tokara support Anthropic Prompt Caching in Claude Code?",
+				answer:   "Yes. Native /v1/messages routing preserves cache creation and cache read tokens, cutting repeated repository context input costs significantly.",
+			},
+		},
+	},
+	"/gpt": {
+		zh: copywriting{
+			title:       "OpenAI GPT-6.2 / GPT-6.1 与 Codex CLI API 接入指南｜Tokara",
+			description: "通过 Tokara 统一接入最新 OpenAI GPT-6.2 / GPT-6 Astra、GPT-6.2 / 6.1 Sol、GPT-6.1 Terra、GPT-6 Luna 与 Codex CLI，原生支持 /v1/responses 与 /v1/chat/completions 协议，按 token 透明计费。",
+		},
+		en: copywriting{
+			title:       "OpenAI GPT-6.2, GPT-6.1 & Codex CLI API Guide — Tokara",
+			description: "Access OpenAI GPT-6.2 / GPT-6 Astra, GPT-6.2 / 6.1 Sol, GPT-6.1 Terra, GPT-6 Luna and Codex CLI through Tokara with native /v1/responses and /v1/chat/completions endpoints and pay-as-you-go token billing.",
+		},
+		trail: []crumb{{name: "OpenAI GPT & Codex", path: "/gpt"}},
+		zhFAQs: []faqItem{
+			{
+				question: "Codex CLI 如何配置接入 Tokara？",
+				answer:   "在 ~/.codex/config.toml 中新增 model_providers.tokara，将 base_url 设为 https://tokara.top/v1，wire_api 设为 responses，并通过环境变量传入 Tokara 的 sk- 令牌即可。",
+			},
+			{
+				question: "GPT-6 Astra、Sol、Terra 与 Luna 系列该如何选择？",
+				answer:   "Astra（gpt-6.2-astra / gpt-6-astra）适合高难度系统设计与深度推理；Sol（gpt-6.2-sol / gpt-6.1-sol）兼顾编码智商与响应速度，适合作为 Codex CLI 主力；gpt-6.1-terra 擅长视觉推理与 Computer Use；gpt-6-luna 适合高并发低成本任务。",
+			},
+			{
+				question: "/v1/responses 和 /v1/chat/completions 有什么区别？",
+				answer:   "Responses API（/v1/responses）原生面向多步工具调用、可控推理强度（reasoning effort）与 Agent 状态流式传输；传统应用仍可继续使用 /v1/chat/completions，两者共用同一个密钥。",
+			},
+		},
+		enFAQs: []faqItem{
+			{
+				question: "How do I connect OpenAI Codex CLI to Tokara?",
+				answer:   "Add a model_providers.tokara block in ~/.codex/config.toml with base_url set to https://tokara.top/v1, wire_api = \"responses\", and export your Tokara sk- key.",
+			},
+			{
+				question: "How do GPT-6 Astra, Sol, Terra and Luna differ?",
+				answer:   "Astra (gpt-6.2-astra / gpt-6-astra) targets frontier reasoning and architecture, Sol (gpt-6.2-sol / gpt-6.1-sol) balances coding intelligence and speed for Codex CLI, gpt-6.1-terra excels at visual reasoning and computer use, and gpt-6-luna handles high-volume low-cost workloads.",
+			},
+			{
+				question: "Should I use /v1/responses or /v1/chat/completions?",
+				answer:   "Use /v1/responses for Codex CLI, configurable reasoning effort and multi-step tool workflows; keep /v1/chat/completions for drop-in OpenAI SDK compatibility. Both share the same API key.",
+			},
+		},
+	},
+	"/gemini": {
+		zh: copywriting{
+			title:       "Google Gemini 4（Carbon / Argon / Hydrogen）与 3.8 Flash API 接入指南｜Tokara",
+			description: "通过 Tokara 调用最新 Google Gemini 4 Carbon、Gemini 4 Argon、Gemini 4 Hydrogen 与 Gemini 3.8 Flash，同时兼容原生 /v1beta 接口与 OpenAI SDK，支持百万级上下文、动态思考与多模态按量计费。",
+		},
+		en: copywriting{
+			title:       "Google Gemini 4 (Carbon, Argon, Hydrogen) & 3.8 Flash API Guide — Tokara",
+			description: "Call Google Gemini 4 Carbon, Gemini 4 Argon, Gemini 4 Hydrogen and Gemini 3.8 Flash on Tokara over native /v1beta endpoints or an OpenAI-compatible SDK, with 1M+ token context and per-token billing.",
+		},
+		trail: []crumb{{name: "Google Gemini", path: "/gemini"}},
+		zhFAQs: []faqItem{
+			{
+				question: "可以用 OpenAI SDK 直接调用 Gemini 4 系列和 Gemini 3.8 Flash 吗？",
+				answer:   "可以。Tokara 同时提供 OpenAI 兼容入口（/v1/chat/completions）与 Google GenAI 原生入口（/v1beta/models/{model}:generateContent），两种方式共用同一个 API Key。",
+			},
+			{
+				question: "Gemini 4 Carbon、Argon、Hydrogen 与 Gemini 3.8 Flash 分别适合什么场景？",
+				answer:   "gemini-4-carbon 面向高难度编码、科学推理与百万上下文深度分析；gemini-4-argon 兼顾前沿推理与更高 Token 效率；gemini-4-hydrogen 是日常全能编码与多模态主力；gemini-3.8-flash 提供极高吞吐的实时 Agent 编排。",
+			},
+			{
+				question: "Gemini 4 的多模态与百万上下文如何计费？",
+				answer:   "按实际输入（文本、图像、PDF、音视频折算 token）、动态思考与输出 token 结算，所有明细均可在控制台用量日志中逐笔核对。",
+			},
+		},
+		enFAQs: []faqItem{
+			{
+				question: "Can I call Gemini 4 models and Gemini 3.8 Flash with the OpenAI SDK?",
+				answer:   "Yes. Tokara exposes both the OpenAI-compatible /v1/chat/completions route and native Google GenAI /v1beta/models/{model}:generateContent endpoints under one API key.",
+			},
+			{
+				question: "When should I choose Gemini 4 Carbon, Argon, Hydrogen or Gemini 3.8 Flash?",
+				answer:   "Choose gemini-4-carbon for frontier coding and deep 1M-context reasoning, gemini-4-argon for fast token-efficient reasoning, gemini-4-hydrogen for everyday coding and multimodal tasks, and gemini-3.8-flash for high-throughput agent orchestration.",
+			},
+			{
+				question: "How is Gemini 4 multimodal and 1M-context usage billed?",
+				answer:   "Text, image, PDF, audio and video inputs plus thinking and output tokens are metered transparently per request and recorded in your console usage log.",
+			},
+		},
 	},
 	"/pricing": {
 		zh: copywriting{
@@ -117,7 +277,7 @@ func organizationDescription(lang string) string {
 // preferredLanguage maps an Accept-Language header onto one of the two
 // metadata languages the site ships with.
 func preferredLanguage(acceptLanguage string) string {
-	for _, part := range strings.Split(acceptLanguage, ",") {
+	for part := range strings.SplitSeq(acceptLanguage, ",") {
 		tag, _, _ := strings.Cut(strings.TrimSpace(part), ";")
 		tag = strings.ToLower(strings.TrimSpace(tag))
 		if tag == "" || tag == "*" {
@@ -202,16 +362,28 @@ func isPrintableModelName(name string) bool {
 }
 
 type jsonLD struct {
-	Context         string       `json:"@context"`
-	Type            string       `json:"@type"`
-	ID              string       `json:"@id,omitempty"`
-	Name            string       `json:"name,omitempty"`
-	URL             string       `json:"url,omitempty"`
-	Description     string       `json:"description,omitempty"`
-	InLanguage      string       `json:"inLanguage,omitempty"`
-	Logo            *imageObject `json:"logo,omitempty"`
-	Publisher       *reference   `json:"publisher,omitempty"`
-	ItemListElement []listItem   `json:"itemListElement,omitempty"`
+	Context         string        `json:"@context"`
+	Type            string        `json:"@type"`
+	ID              string        `json:"@id,omitempty"`
+	Name            string        `json:"name,omitempty"`
+	URL             string        `json:"url,omitempty"`
+	Description     string        `json:"description,omitempty"`
+	InLanguage      string        `json:"inLanguage,omitempty"`
+	Logo            *imageObject  `json:"logo,omitempty"`
+	Publisher       *reference    `json:"publisher,omitempty"`
+	ItemListElement []listItem    `json:"itemListElement,omitempty"`
+	MainEntity      []faqQuestion `json:"mainEntity,omitempty"`
+}
+
+type faqQuestion struct {
+	Type           string    `json:"@type"`
+	Name           string    `json:"name"`
+	AcceptedAnswer faqAnswer `json:"acceptedAnswer"`
+}
+
+type faqAnswer struct {
+	Type string `json:"@type"`
+	Text string `json:"text"`
 }
 
 type imageObject struct {
@@ -283,7 +455,11 @@ func Document(indexPage []byte, requestPath, origin, acceptLanguage string) []by
 	// Search Console HTML-tag verification, when the operator sets it.
 	writeMeta(&head, "name", "google-site-verification", os.Getenv("GOOGLE_SITE_VERIFICATION"))
 	if indexable {
-		head.WriteString(structuredData(base, documentPath, lang, meta.trail))
+		faqs := meta.zhFAQs
+		if lang == langEn {
+			faqs = meta.enFAQs
+		}
+		head.WriteString(structuredData(base, documentPath, lang, meta.trail, faqs))
 	}
 	// The document title of a single-page app must change on client-side
 	// navigation. Shipping the copy once, in the page, keeps the browser tab and
@@ -296,7 +472,7 @@ func Document(indexPage []byte, requestPath, origin, acceptLanguage string) []by
 	return []byte(document)
 }
 
-func structuredData(base, documentPath, lang string, trail []crumb) string {
+func structuredData(base, documentPath, lang string, trail []crumb, faqs []faqItem) string {
 	organizationID := base + "/#organization"
 	graph := []any{
 		jsonLD{
@@ -327,6 +503,22 @@ func structuredData(base, documentPath, lang string, trail []crumb) string {
 		}
 		graph = append(graph, jsonLD{
 			Context: "https://schema.org", Type: "BreadcrumbList", ItemListElement: items,
+		})
+	}
+	if len(faqs) > 0 {
+		questions := make([]faqQuestion, 0, len(faqs))
+		for _, item := range faqs {
+			questions = append(questions, faqQuestion{
+				Type: "Question",
+				Name: item.question,
+				AcceptedAnswer: faqAnswer{
+					Type: "Answer",
+					Text: item.answer,
+				},
+			})
+		}
+		graph = append(graph, jsonLD{
+			Context: "https://schema.org", Type: "FAQPage", MainEntity: questions,
 		})
 	}
 	encoded, err := common.Marshal(graph)

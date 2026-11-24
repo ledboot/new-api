@@ -27,6 +27,8 @@ import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { Hero } from '@/features/home/components/sections/hero'
+import { ModelEcosystem } from '@/features/home/components/sections/model-ecosystem'
+import { ModelGuidePage, type ModelGuideSlug } from '@/features/model-guides'
 import { STATUS_QUERY_KEY } from '@/lib/status-query'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
@@ -128,4 +130,76 @@ describe('Tokara home navigation', () => {
     expect(label).toHaveClass('truncate', 'max-w-32')
     expect(label.previousElementSibling).toHaveAttribute('src', '/custom.svg')
   })
+
+  it('links to dedicated Claude Code, GPT, and Gemini SEO landing pages from home sections', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryClients.push(queryClient)
+    const rootRoute = createRootRoute({
+      component: () => (
+        <>
+          <Hero isAuthenticated={false} />
+          <ModelEcosystem />
+        </>
+      ),
+    })
+    const router = createRouter({
+      routeTree: rootRoute,
+      history: createMemoryHistory({ initialEntries: ['/'] }),
+    })
+    await router.load()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    )
+
+    const hrefs = screen
+      .getAllByRole('link')
+      .map((anchor) => anchor.getAttribute('href'))
+    expect(hrefs).toContain('/claude-code')
+    expect(hrefs).toContain('/gpt')
+    expect(hrefs).toContain('/gemini')
+    expect(
+      screen.getByText('claude-opus-5-5', { selector: 'code' })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('gpt-6.1-sol', { selector: 'code' })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('gemini-4-carbon', { selector: 'code' })
+    ).toBeInTheDocument()
+  })
+
+  it.each<[ModelGuideSlug, string, string]>([
+    ['claude-code', 'Claude Code & Claude 5.5', 'claude-fable-5-2'],
+    ['gpt', 'OpenAI GPT-6.2, 6.1 & Codex', 'gpt-6-astra'],
+    ['gemini', 'Google Gemini 4 & 3.8 Flash', 'gemini-4-carbon'],
+  ])(
+    'renders the %s SEO landing page with flagship models and cross-links',
+    async (slug, expectedHeading, expectedModelId) => {
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      })
+      queryClients.push(queryClient)
+      const rootRoute = createRootRoute({
+        component: () => <ModelGuidePage slug={slug} />,
+      })
+      const router = createRouter({
+        routeTree: rootRoute,
+        history: createMemoryHistory({ initialEntries: [`/${slug}`] }),
+      })
+      await router.load()
+      render(
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      )
+
+      const h1 = await screen.findByRole('heading', { level: 1 })
+      expect(h1.textContent).toContain(expectedHeading)
+      expect(screen.getByText(expectedModelId)).toBeInTheDocument()
+    }
+  )
 })

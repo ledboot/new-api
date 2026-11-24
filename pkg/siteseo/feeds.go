@@ -11,6 +11,9 @@ import (
 // They are the pages the embedded frontend renders without authentication.
 var indexablePaths = []string{
 	"/",
+	"/claude-code",
+	"/gpt",
+	"/gemini",
 	"/pricing",
 	"/docs",
 	"/about",
@@ -81,6 +84,10 @@ func LLMsTxt(origin string) string {
 	builder.WriteString("- API keys, quotas and usage logs managed from a web console.\n")
 	builder.WriteString("- Per-model pricing with pay-as-you-go billing and group rate multipliers.\n")
 	builder.WriteString("- Model rankings and performance data for choosing a model per workload.\n\n")
+	builder.WriteString("## Model & CLI Guides\n\n")
+	builder.WriteString("- [Claude Code & Claude 5.5 / Fable 5.2 API](" + origin + "/claude-code): Native `/v1/messages` endpoint for Claude Code CLI, Claude Fable 5.2, Opus 5.5, Sonnet 5.5 and Haiku 5.5 with prompt caching.\n")
+	builder.WriteString("- [OpenAI GPT-6.2 / 6.1 & Codex CLI](" + origin + "/gpt): Native `/v1/responses` and `/v1/chat/completions` endpoints for GPT-6.2 / GPT-6 Astra, GPT-6.2 / 6.1 Sol, GPT-6.1 Terra, GPT-6 Luna and Codex CLI.\n")
+	builder.WriteString("- [Google Gemini 4 & 3.8 Flash API](" + origin + "/gemini): Native `/v1beta` and OpenAI-compatible `/v1` endpoints for Gemini 4 Carbon, Argon, Hydrogen and Gemini 3.8 Flash with 1M+ token multimodal context.\n\n")
 	builder.WriteString("## Pages\n\n")
 	for _, documentPath := range indexablePaths {
 		builder.WriteString("- [" + documentPath + "](" + origin + documentPath + ")\n")

@@ -121,6 +121,37 @@ function LegalLinks(props: {
   return <div className={props.wrapperClassName}>{links}</div>
 }
 
+function EcosystemFooterNav(props: { className?: string }) {
+  const { t } = useTranslation()
+  const items = [
+    { label: 'Claude Code', href: '/claude-code' as const },
+    { label: 'OpenAI GPT & Codex', href: '/gpt' as const },
+    { label: 'Google Gemini', href: '/gemini' as const },
+    { label: t('Model Square'), href: '/pricing' as const },
+    { label: t('Docs'), href: '/docs' as const },
+  ]
+
+  return (
+    <nav
+      aria-label={t('Model Ecosystem')}
+      className={cn(
+        'text-muted-foreground flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs',
+        props.className
+      )}
+    >
+      {items.map((item) => (
+        <Link
+          key={item.href}
+          to={item.href}
+          className='hover:text-foreground transition-colors duration-200'
+        >
+          {item.label}
+        </Link>
+      ))}
+    </nav>
+  )
+}
+
 export function Footer(props: FooterProps) {
   const { t } = useTranslation()
   const {
@@ -198,13 +229,16 @@ export function Footer(props: FooterProps) {
           props.className
         )}
       >
-        <div className='site-container mx-auto w-full px-6 py-5'>
+        <div className='site-container mx-auto w-full space-y-3 px-6 py-5'>
           <div className='bg-muted/20 border-border/50 flex flex-col items-center justify-between gap-4 rounded-2xl border px-4 py-4 backdrop-blur-sm sm:flex-row sm:px-5'>
             <div
               className='custom-footer text-muted-foreground min-w-0 text-center text-sm sm:text-left'
               dangerouslySetInnerHTML={{ __html: footerHtml }}
             />
-            <LegalLinks wrapperClassName='border-border/60 text-muted-foreground/45 flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t pt-4 text-xs sm:w-auto sm:justify-end sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5' />
+            <div className='flex w-full flex-col items-center gap-2 sm:w-auto sm:items-end'>
+              <EcosystemFooterNav className='sm:justify-end' />
+              <LegalLinks wrapperClassName='border-border/60 text-muted-foreground/45 flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t pt-3 text-xs sm:w-auto sm:justify-end sm:border-t-0 sm:pt-0' />
+            </div>
           </div>
         </div>
       </footer>
@@ -255,8 +289,8 @@ export function Footer(props: FooterProps) {
           )}
         </div>
 
-        {/* Copyright and optional legal links wrap on narrow screens. */}
-        <div className='border-border/30 mt-12 flex flex-col items-center justify-between gap-x-3 gap-y-2 border-t pt-6 sm:flex-row'>
+        {/* Copyright, model guides, and optional legal links wrap on narrow screens. */}
+        <div className='border-border/30 mt-12 flex flex-col items-center justify-between gap-4 border-t pt-6 sm:flex-row'>
           <div className='text-muted-foreground/40 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs sm:justify-start'>
             <span>
               &copy; {currentYear} {displayName}.{' '}
@@ -264,6 +298,7 @@ export function Footer(props: FooterProps) {
             </span>
             <LegalLinks leadingSeparator />
           </div>
+          <EcosystemFooterNav className='sm:justify-end' />
         </div>
       </div>
     </footer>

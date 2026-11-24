@@ -505,6 +505,39 @@ export function PublicHeader(props: PublicHeaderProps) {
                 </Link>
               )
             })}
+
+            {/* Mobile Model Ecosystem Quick-Jump Strip */}
+            <div className='mt-3 pt-2'>
+              <p className='text-muted-foreground mb-2 px-1 font-mono text-[10px] font-semibold tracking-[0.18em] uppercase'>
+                {t('Model Ecosystem')}
+              </p>
+              <div className='grid grid-cols-3 gap-2'>
+                {(
+                  [
+                    { label: 'Claude Code', href: '/claude-code' },
+                    { label: 'GPT-6.2 & Codex', href: '/gpt' },
+                    { label: 'Gemini 4', href: '/gemini' },
+                  ] as const
+                ).map((item) => {
+                  const active = pathname === item.href
+                  return (
+                    <Link
+                      key={item.href}
+                      to={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        'flex items-center justify-center rounded-xl border px-2.5 py-2.5 text-center text-xs font-medium transition-colors',
+                        active
+                          ? 'border-primary/45 bg-primary/12 text-primary font-semibold'
+                          : 'border-border/65 bg-card/75 text-foreground/85 hover:border-primary/30'
+                      )}
+                    >
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
           </nav>
 
           <div

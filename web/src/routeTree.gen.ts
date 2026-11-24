@@ -30,6 +30,9 @@ import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as AuthenticatedChat2linkRouteImport } from './routes/_authenticated/chat2link'
 import { Route as AuthenticatedSystemSettingsRouteRouteImport } from './routes/_authenticated/system-settings/route'
 import { Route as AboutIndexRouteImport } from './routes/about/index'
+import { Route as ClaudeCodeIndexRouteImport } from './routes/claude-code/index'
+import { Route as GeminiIndexRouteImport } from './routes/gemini/index'
+import { Route as GptIndexRouteImport } from './routes/gpt/index'
 import { Route as OauthProviderRouteImport } from './routes/oauth/$provider'
 import { Route as PricingIndexRouteImport } from './routes/pricing/index'
 import { Route as RankingsIndexRouteImport } from './routes/rankings/index'
@@ -181,6 +184,21 @@ const AuthenticatedSystemSettingsRouteRoute =
 const AboutIndexRoute = AboutIndexRouteImport.update({
   id: '/about/',
   path: '/about/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClaudeCodeIndexRoute = ClaudeCodeIndexRouteImport.update({
+  id: '/claude-code/',
+  path: '/claude-code/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GeminiIndexRoute = GeminiIndexRouteImport.update({
+  id: '/gemini/',
+  path: '/gemini/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GptIndexRoute = GptIndexRouteImport.update({
+  id: '/gpt/',
+  path: '/gpt/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OauthProviderRoute = OauthProviderRouteImport.update({
@@ -484,6 +502,9 @@ export interface FileRoutesByFullPath {
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about/': typeof AboutIndexRoute
+  '/claude-code/': typeof ClaudeCodeIndexRoute
+  '/gemini/': typeof GeminiIndexRoute
+  '/gpt/': typeof GptIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
   '/setup/': typeof SetupIndexRoute
@@ -552,6 +573,9 @@ export interface FileRoutesByTo {
   '/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about': typeof AboutIndexRoute
+  '/claude-code': typeof ClaudeCodeIndexRoute
+  '/gemini': typeof GeminiIndexRoute
+  '/gpt': typeof GptIndexRoute
   '/pricing': typeof PricingIndexRoute
   '/rankings': typeof RankingsIndexRoute
   '/setup': typeof SetupIndexRoute
@@ -624,6 +648,9 @@ export interface FileRoutesById {
   '/_authenticated/chat2link': typeof AuthenticatedChat2linkRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/about/': typeof AboutIndexRoute
+  '/claude-code/': typeof ClaudeCodeIndexRoute
+  '/gemini/': typeof GeminiIndexRoute
+  '/gpt/': typeof GptIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
   '/setup/': typeof SetupIndexRoute
@@ -695,6 +722,9 @@ export interface FileRouteTypes {
     | '/chat2link'
     | '/oauth/$provider'
     | '/about/'
+    | '/claude-code/'
+    | '/gemini/'
+    | '/gpt/'
     | '/pricing/'
     | '/rankings/'
     | '/setup/'
@@ -763,6 +793,9 @@ export interface FileRouteTypes {
     | '/chat2link'
     | '/oauth/$provider'
     | '/about'
+    | '/claude-code'
+    | '/gemini'
+    | '/gpt'
     | '/pricing'
     | '/rankings'
     | '/setup'
@@ -834,6 +867,9 @@ export interface FileRouteTypes {
     | '/_authenticated/chat2link'
     | '/oauth/$provider'
     | '/about/'
+    | '/claude-code/'
+    | '/gemini/'
+    | '/gpt/'
     | '/pricing/'
     | '/rankings/'
     | '/setup/'
@@ -897,6 +933,9 @@ export interface RootRouteChildren {
   errors503Route: typeof errors503Route
   OauthProviderRoute: typeof OauthProviderRoute
   AboutIndexRoute: typeof AboutIndexRoute
+  ClaudeCodeIndexRoute: typeof ClaudeCodeIndexRoute
+  GeminiIndexRoute: typeof GeminiIndexRoute
+  GptIndexRoute: typeof GptIndexRoute
   PricingIndexRoute: typeof PricingIndexRoute
   RankingsIndexRoute: typeof RankingsIndexRoute
   SetupIndexRoute: typeof SetupIndexRoute
@@ -1050,6 +1089,27 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about/'
       preLoaderRoute: typeof AboutIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/claude-code/': {
+      id: '/claude-code/'
+      path: '/claude-code'
+      fullPath: '/claude-code/'
+      preLoaderRoute: typeof ClaudeCodeIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gemini/': {
+      id: '/gemini/'
+      path: '/gemini'
+      fullPath: '/gemini/'
+      preLoaderRoute: typeof GeminiIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gpt/': {
+      id: '/gpt/'
+      path: '/gpt'
+      fullPath: '/gpt/'
+      preLoaderRoute: typeof GptIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/oauth/$provider': {
@@ -1561,6 +1621,9 @@ const rootRouteChildren: RootRouteChildren = {
   errors503Route: errors503Route,
   OauthProviderRoute: OauthProviderRoute,
   AboutIndexRoute: AboutIndexRoute,
+  ClaudeCodeIndexRoute: ClaudeCodeIndexRoute,
+  GeminiIndexRoute: GeminiIndexRoute,
+  GptIndexRoute: GptIndexRoute,
   PricingIndexRoute: PricingIndexRoute,
   RankingsIndexRoute: RankingsIndexRoute,
   SetupIndexRoute: SetupIndexRoute,
