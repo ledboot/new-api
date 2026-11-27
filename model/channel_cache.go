@@ -28,18 +28,29 @@ var channelSyncLock sync.RWMutex
 // that read the database earlier never publishes over a later one.
 var channelCacheReloadLock sync.Mutex
 
-func InitChannelCache() {
+// LoadChannelCache reloads the in-memory channel routing maps from the
+// database. A failed read leaves the existing cache untouched.
+func LoadChannelCache() error {
 	channelCacheReloadLock.Lock()
 	defer channelCacheReloadLock.Unlock()
 	if !common.MemoryCacheEnabled {
 		InvalidatePricingCache()
 		rebuildTaskAliasView()
-		return
+		return nil
 	}
-	newChannelId2channel := make(map[int]*Channel)
-	newChannel2advancedCustomConfig := make(map[int]*kitdto.AdvancedCustomConfig)
+	if DB == nil {
+		return errors.New("database is not initialized")
+	}
 	var channels []*Channel
-	DB.Find(&channels)
+	if err := DB.Find(&channels).Error; err != nil {
+		return fmt.Errorf("query channels: %w", err)
+	}
+	var abilities []*Ability
+	if err := DB.Find(&abilities).Error; err != nil {
+		return fmt.Errorf("query abilities: %w", err)
+	}
+	newChannelId2channel := make(map[int]*Channel, len(channels))
+	newChannel2advancedCustomConfig := make(map[int]*kitdto.AdvancedCustomConfig)
 	for _, channel := range channels {
 		newChannelId2channel[channel.Id] = channel
 		if channel.Type == constant.ChannelTypeAdvancedCustom {
@@ -48,28 +59,25 @@ func InitChannelCache() {
 			}
 		}
 	}
-	var abilities []*Ability
-	DB.Find(&abilities)
-	groups := make(map[string]bool)
-	for _, ability := range abilities {
-		groups[ability.Group] = true
-	}
 	newGroup2model2channels := make(map[string]map[string][]int)
-	for group := range groups {
-		newGroup2model2channels[group] = make(map[string][]int)
+	for _, ability := range abilities {
+		if _, ok := newGroup2model2channels[ability.Group]; !ok {
+			newGroup2model2channels[ability.Group] = make(map[string][]int)
+		}
 	}
 	for _, channel := range channels {
 		if channel.Status != common.ChannelStatusEnabled {
 			continue // skip disabled channels
 		}
-		groups := strings.SplitSeq(channel.Group, ",")
-		for group := range groups {
-			models := channel.GetModels()
+		models := channel.GetModels()
+		for group := range strings.SplitSeq(channel.Group, ",") {
+			model2channels := newGroup2model2channels[group]
+			if model2channels == nil {
+				model2channels = make(map[string][]int)
+				newGroup2model2channels[group] = model2channels
+			}
 			for _, model := range models {
-				if _, ok := newGroup2model2channels[group][model]; !ok {
-					newGroup2model2channels[group][model] = make([]int, 0)
-				}
-				newGroup2model2channels[group][model] = append(newGroup2model2channels[group][model], channel.Id)
+				model2channels[model] = append(model2channels[model], channel.Id)
 			}
 		}
 	}
@@ -86,7 +94,6 @@ func InitChannelCache() {
 
 	channelSyncLock.Lock()
 	group2model2channels = newGroup2model2channels
-	//channelsIDM = newChannelId2channel
 	for i, channel := range newChannelId2channel {
 		if channel.ChannelInfo.IsMultiKey {
 			channel.Keys = channel.GetKeys()
@@ -110,6 +117,13 @@ func InitChannelCache() {
 	InvalidatePricingCache()
 	rebuildTaskAliasView()
 	common.SysLog(common.LogText("channels synced from database"))
+	return nil
+}
+
+func InitChannelCache() {
+	if err := LoadChannelCache(); err != nil {
+		common.SysError(common.LogText("failed to load channels from database: %s", err.Error()))
+	}
 }
 
 func SyncChannelCache(frequency int) {

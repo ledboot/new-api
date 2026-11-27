@@ -90,20 +90,10 @@ func main() {
 		common.SysLog(common.LogText("memory cache enabled"))
 		common.SysLog(common.LogText("sync frequency: %d seconds", common.SyncFrequency))
 
-		// Add panic recovery and retry for InitChannelCache
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					common.SysLog(common.LogText("InitChannelCache panic: %v, retrying once", r))
-					// Retry once
-					_, _, fixErr := model.FixAbility()
-					if fixErr != nil {
-						common.FatalLog(common.LogText("InitChannelCache failed: %s", fixErr.Error()))
-					}
-				}
-			}()
-			model.InitChannelCache()
-		}()
+		if err := model.LoadChannelCache(); err != nil {
+			common.SysError(common.LogText("failed to load channels from database: %s", err.Error()))
+			service.SyncTopicLoadFailed(model.SyncTopicChannels, err)
+		}
 
 		go model.SyncChannelCache(common.SyncFrequency)
 	}
@@ -123,7 +113,9 @@ func main() {
 	if common.MemoryCacheEnabled || common.IsMasterNode {
 		service.RegisterSyncTopic(model.SyncTopicChannels, func(ctx context.Context) error {
 			if common.MemoryCacheEnabled {
-				model.InitChannelCache()
+				if err := model.LoadChannelCache(); err != nil {
+					return err
+				}
 			}
 			return service.ScanScheduledPlugins(ctx)
 		})
